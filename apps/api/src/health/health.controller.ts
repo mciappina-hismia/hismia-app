@@ -1,23 +1,13 @@
-import { Controller, Get, Inject } from '@nestjs/common';
-import type { HealthResponse } from '@hismia/types';
-import { START_TIME, type StartTimeProvider } from './start-time.provider';
+import { Controller, Get } from '@nestjs/common';
+import type { HealthCheckReport } from './health-check.types';
+import { HealthService } from './health.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(
-    @Inject(START_TIME) private readonly startTime: StartTimeProvider,
-  ) {}
+  constructor(private readonly health: HealthService) {}
 
   @Get()
-  getHealth(): HealthResponse {
-    const uptimeSeconds = Math.max(
-      0,
-      Math.floor((Date.now() - this.startTime.getStartTime().getTime()) / 1000),
-    );
-    return {
-      status: 'ok',
-      apiVersion: 'v1',
-      uptimeSeconds,
-    };
+  getHealth(): Promise<HealthCheckReport> {
+    return this.health.getReport();
   }
 }
