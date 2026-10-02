@@ -142,7 +142,7 @@ Tras evaluar las opciones (Tailwind CSS v4 vs. CSS variables) y considerando que
 
 Pasos a seguir cuando se llegue a ese punto:
 
-1. Inicializar el proyecto frontend con el framework elegido (ver [ADR-0001](../adr/0001-frontend-framework-nextjs.md)).
+1. Inicializar el proyecto frontend con el framework elegido.
 2. Instalar Tailwind CSS siguiendo la guía oficial de la versión adoptada.
 3. Crear `tailwind.config.{js,ts}` en la raíz del frontend.
 4. Copiar los valores de las secciones "Paciente — modo claro", "Profesional", "Colores de estado", "Gráficos", "Marca", "Paletas alternativas" y "Alto contraste" de este documento a `theme.extend.colors` del config.

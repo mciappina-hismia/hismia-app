@@ -5,15 +5,26 @@ Estas descripciones presentan propósitos generales, no prueban que cada integra
 ## Aplicación y lenguaje
 
 - **[NestJS](https://docs.nestjs.com/):** marco para organizar aplicaciones de servidor, entradas HTTP y servicios. Su estructura no reemplaza las reglas de autorización por recurso.
-- **[Next.js - React](https://nextjs.org/docs):** marco de aplicaciones web basado en React para las interfaces. Aquí no se elige una estrategia de renderizado ni de sesiones.
--  React Hook Form + resolvers
+- **[Next.js](https://nextjs.org/docs):** marco de aplicaciones web basado en React para las interfaces. Aquí no se elige una estrategia de renderizado ni de sesiones.
+- **[React Hook Form](https://react-hook-form.com/) + [@hookform/resolvers](https://github.com/react-hook-form/resolvers):** librería de formularios para React con renderizado mínimo por campo y soporte nativo de validación HTML. `@hookform/resolvers` integra esquemas externos (Zod, Yup, Joi, Valibot) para validar el formulario en el cliente y/o en el servidor. Validar en el cliente no otorga autorización ni reemplaza los controles del servidor.
 - **[TypeScript](https://www.typescriptlang.org/docs/):** lenguaje con tipado estático para expresar contratos en código; los tipos no validan por sí solos datos externos ni permisos.
-- **[Helmet
-- **[jose
+- **[Helmet](https://helmet.js.org/):** middleware para Node/Express que aplica cabeceras de seguridad HTTP (CSP, HSTS, X-Frame-Options, Referrer-Policy, entre otras). Endurece respuestas HTTP; no aplica autenticación, autorización por recurso ni controles clínicos.
+- **[jose](https://github.com/panva/jose):** módulo JavaScript para JWT, JWS, JWE, JWK y JWKS, portable a Node, navegadores, Cloudflare Workers, Deno y Bun. Útil para verificar tokens y conjuntos de claves remotos; verificar un token no autoriza una historia clínica: propietario, grant, alcance, vigencia y autoría requieren verificaciones separadas.
 
 
- ## Metricas
-  - Supabase Dashboard para ver y analizar metricas desde el admin de Hismia
+## Observabilidad y métricas (selección conceptual)
+
+El admin de Hismia expone métricas técnicas operativas del backend, no KPIs clínicos. Se compone de los dos elementos siguientes:
+
+- **[Supabase Metrics API](https://supabase.com/docs/guides/observability/metrics):** endpoint compatible con Prometheus que expone unas 200 series técnicas (CPU, IO, WAL, conexiones, queries, réplicas de lectura) cada 60 s. El proyecto Hismia lo consume vía scrape autenticado con la service role key; no es un panel embebido sino un origen de datos.
+- **[Grafana](https://grafana.com/docs/grafana/latest/):** plataforma de observabilidad que renderiza series temporales. Hismia usa Grafana como capa de visualización para el admin, apollada en la [plantilla oficial `supabase-grafana`](https://github.com/supabase/supabase-grafana) (~200 paneles técnicos: CPU, IO, WAL, conexiones, queries). Puede autoalojarse o usarse Grafana Cloud; no hay lock-in con un proveedor único.
+- **[Supabase Studio Reports](https://supabase.com/docs/guides/observability/reports):** informes incorporados en Studio (CPU, IO, WAL, conexiones, consultas) complementarios a Grafana para inspección rápida ad-hoc, no son el admin de Hismia.
+
+Lo que esta sección **no** afirma:
+
+- No expone datos clínicos ni historias individuales; los paneles muestran series técnicas agregadas.
+- No hay métricas de producto (consultas cargadas por profesional, historias activas, frecuencia de accesos) implementadas todavía; si se requieren, deben definirse aparte, agregarse y renderizarse con autorización por rol.
+- No se ha seleccionado proveedor de Grafana ni habilitado despliegue automático; publicar sigue requiriendo aprobación humana.
 
 
 ## Cifrado de datos sensibles (selección conceptual)
@@ -39,7 +50,8 @@ Siguen pendientes la clasificación de datos, la autorización de acceso y el al
 - **[Zod](https://zod.dev/):** describe y valida formas de datos en límites apropiados; validar datos en el cliente no otorga autorización y no reemplaza controles de servidor.
 - **[Tailwind CSS](https://tailwindcss.com/docs):** utilidades para estilos de interfaz.
 - **[shadcn/ui](https://ui.shadcn.com/docs):** componentes y patrones de interfaz; su presencia no define accesibilidad ni comportamientos específicos del producto.
-- **[Jest](https://jestjs.io/docs/getting-started):** marco de pruebas automatizadas; la mención no acredita cobertura o pruebas ejecutadas.
+- **[Vitest](https://vitest.dev/):** runner principal para tests unitarios y de integración. Aprovecha la configuración de Vite/tsconfig, soporta ESM nativo y TypeScript sin paso extra de compilación. La estrategia RED → GREEN → REFACTOR se aplica sobre Vitest; ver [AGENTS.md](../AGENTS.md) §5.6.
+- **[Node test runner](https://nodejs.org/api/test.html) (`node:test`):** runner nativo para scripts de soporte y utilidades de tooling que no requieran arrastrar Vitest como dependencia.
 
 ## Calidad y automatización
 
