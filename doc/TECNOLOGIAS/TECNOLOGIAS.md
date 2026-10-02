@@ -4,11 +4,12 @@ Estas descripciones presentan propósitos generales, no prueban que cada integra
 
 ## Aplicación y lenguaje
 
-- **[NestJS](https://docs.nestjs.com/):** marco para organizar aplicaciones de servidor, entradas HTTP y servicios. Su estructura no reemplaza las reglas de autorización por recurso.
+- **[NestJS](https://docs.nestjs.com/):** marco para organizar aplicaciones de servidor, entradas HTTP y servicios. En este proyecto corre sobre **Fastify** (no Express) vía `@nestjs/platform-fastify`. Su estructura no reemplaza las reglas de autorización por recurso.
 - **[Next.js](https://nextjs.org/docs):** marco de aplicaciones web basado en React para las interfaces. Aquí no se elige una estrategia de renderizado ni de sesiones.
 - **[React Hook Form](https://react-hook-form.com/) + [@hookform/resolvers](https://github.com/react-hook-form/resolvers):** librería de formularios para React con renderizado mínimo por campo y soporte nativo de validación HTML. `@hookform/resolvers` integra esquemas externos (Zod, Yup, Joi, Valibot) para validar el formulario en el cliente y/o en el servidor. Validar en el cliente no otorga autorización ni reemplaza los controles del servidor.
 - **[TypeScript](https://www.typescriptlang.org/docs/):** lenguaje con tipado estático para expresar contratos en código; los tipos no validan por sí solos datos externos ni permisos.
-- **[Helmet](https://helmet.js.org/):** middleware para Node/Express que aplica cabeceras de seguridad HTTP (CSP, HSTS, X-Frame-Options, Referrer-Policy, entre otras). Endurece respuestas HTTP; no aplica autenticación, autorización por recurso ni controles clínicos.
+- **[Fastify](https://fastify.dev/) + [@nestjs/platform-fastify](https://docs.nestjs.com/techniques/performance):** HTTP adapter de NestJS en este proyecto. Más rápido que Express, validación JSON schema nativa, mejor manejo de streams para PDFs. **[@fastify/helmet](https://github.com/fastify/fastify-helmet)** aplica cabeceras de seguridad (CSP, HSTS, X-Frame-Options, Referrer-Policy). Endurece respuestas HTTP; no aplica autenticación, autorización por recurso ni controles clínicos.
+- **[@fastify/rate-limit](https://github.com/fastify/fastify-rate-limit):** limitador de requests global por defecto (100 req/min/IP configurable por env), con override más estricto en `/login` y `/signup` para mitigar brute-force. Aplicado como hook global en `main.ts`.
 - **[jose](https://github.com/panva/jose):** módulo JavaScript para JWT, JWS, JWE, JWK y JWKS, portable a Node, navegadores, Cloudflare Workers, Deno y Bun. Útil para verificar tokens y conjuntos de claves remotos; verificar un token no autoriza una historia clínica: propietario, grant, alcance, vigencia y autoría requieren verificaciones separadas.
 
 
@@ -41,7 +42,7 @@ Siguen pendientes la clasificación de datos, la autorización de acceso y el al
 ## Identidad, datos y estado
 
 - **[Supabase](https://supabase.com/docs):** plataforma que ofrece servicios de backend; su mención no implica elegir almacenamiento de archivos, tiempo real, funciones, alojamiento ni acceso directo del navegador a datos clínicos.
-- **[Supabase Auth](https://supabase.com/docs/guides/auth):** gestiona autenticación e identidad de cuenta. Autenticarse no autoriza una historia clínica: propietario, grant, alcance, vigencia y autoría requieren verificaciones separadas.
+- **[Supabase Auth](https://supabase.com/docs/guides/auth):** gestiona autenticación e identidad de cuenta. **El backend de Hismia delega Auth a Supabase**: no maneja contraseñas ni hash. El frontend autentica contra Supabase Auth y envía el access token (JWT); el backend lo verifica contra el JWKS público de Supabase usando `jose`. Autenticarse no autoriza una historia clínica: propietario, grant, alcance, vigencia y autoría requieren verificaciones separadas en el backend de Hismia.
 - **[Prisma](https://www.prisma.io/docs):** herramienta para modelar y consultar datos persistentes. Persistir o leer mediante Prisma no propaga automáticamente grants de usuario ni garantiza la aplicación de políticas RLS; las fronteras efectivas de autorización deben comprobarse para cada ruta de acceso.
 - **[Zustand](https://zustand.docs.pmnd.rs/):** gestiona estado de interfaz en el cliente; ese estado no constituye autoridad sobre permisos.
 
