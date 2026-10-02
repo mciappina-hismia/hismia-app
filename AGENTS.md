@@ -130,6 +130,36 @@ El proyecto usa **Vitest** como runner principal (unitarias + integración) y **
 
 ## 5. Convenciones de código
 
+### 5.0 Principios de escalabilidad
+
+El MVP se construye asumiendo que **mañana va a escalar** — más usuarios, más datos, más desarrolladores, más features. Las decisiones de arquitectura y código del MVP deben ser compatibles con ese crecimiento, **aunque no implementen hoy toda la infraestructura para soportarlo**. Si una decisión temprana obliga a reescritura cuando llegue el crecimiento, está mal tomada.
+
+**Eje 1 — Tráfico y datos (escala runtime):**
+
+- **Backend stateless** desde el día 1: ninguna sesión ni estado de aplicación en memoria del proceso. Estado solo en persistencia. Esto habilita escalar horizontalmente con réplicas detrás de un balanceador sin sticky sessions.
+- **Separación read/write desde el diseño del esquema**, aunque en MVP convivan: cada ruta de acceso tiene claro si lee o escribe. Listar historias es read; cargar PDF es write. Esto permite sumar réplicas de lectura, cache y CDN sin tocar código de negocio cuando llegue el momento.
+- **Paginación obligatoria** en toda lista (historias, PDFs, notas, recordatorios, estadísticas institucionales). Límite máximo por request (ej. 100) más cursor estable. **Nunca** `SELECT *` sin paginar en una ruta que devuelva listas.
+- **Límites por tabla definidos desde el schema** (índices por clave de búsqueda, FKs explícitas, constraints de unicidad donde corresponda). No posponer índices "para cuando crezca": añadir un índice a una tabla con 100k filas en producción es caro; añadirlo con 100 filas es gratis.
+- **Cache solo cuando se justifique con un patrón de acceso real.** No añadir Redis el día 1 sin medir; el sobrecoste de invalidación mata más MVPs que la latencia. Si una ruta es lenta, medir antes de cachear.
+- **Archivos binarios (PDFs) fuera de la base de datos.** Storage gestionado (Supabase Storage, S3 o equivalente) desde el inicio; la BD guarda referencia + metadatos. Esto evita backups de BD que tardan horas y tablas que crecen sin control.
+
+**Eje 2 — Equipo y features (escala organizacional):**
+
+- **Monorepo** desde el inicio (`apps/api`, `apps/front`, `packages/types`, `packages/validation`). Un solo `git log`, una sola CI, contratos tipados compartidos entre frontend y backend sin duplicar.
+- **Contratos estables entre módulos desde el día 1.** Cambiar la forma de un DTO o un endpoint debería requerir actualizar tipos en `packages/types` y la versión del contrato; no se reescribe en silencio. Esto se valida con tests de contrato (ver `doc/DESIGN/DESIGN.md` Task 0.36).
+- **Límites de bounded context respetados en la estructura de carpetas.** El MVP tiene pocos contextos (auth, records, institutions, admin) pero cada uno vive en su propia carpeta con su entrada (controller/UI) y su caso de uso; cruzar límites "porque es más fácil" es deuda que se paga cara cuando hay 10 personas tocando el código.
+- **Tests de contrato entre módulos** — no mocks entre bounded contexts, sino verificación de que los tipos y respuestas cumplen el contrato compartido.
+- **CI por área, no monolítica.** Un PR que toca `apps/api/records` no debe ejecutar la suite de `apps/api/admin`. Las áreas escalan en paralelo; las CI también.
+- **Onboarding legible.** Un desarrollador nuevo (o un agente AI) debe poder entender qué toca y qué no tocando un solo módulo sin leer todo el repo. Documentar límites de cada contexto en su README interno cuando crezca.
+
+**Lo que esta sección NO exige:**
+
+- No exige microservicios. **Hexagonal + monorepo alcanza** para los próximos órdenes de magnitud. Microservicios se introducen solo cuando hay una razón concreta (equipo separado, deploy independiente, tecnología distinta por servicio).
+- No exige Kubernetes, multi-región ni cero downtime. Eso se diseña cuando se justifique.
+- No exige sobre-ingeniería. Si una decisión del MVP es incompatible con escala 1000x pero se reescribe en una semana cuando llegue, es aceptable. Lo que **no** es aceptable es una decisión que exige reescritura de meses o migración de datos.
+
+**Cómo se aplica:** antes de aprobar un PR que toque arquitectura o código nuevo, revisar si respeta estos principios. Si un tradeoff los viola (ej. "para MVP uso sesiones en memoria"), documentarlo en la tarea ODD con la fecha en que se reescribe y el criterio que lo gatilla.
+
 ### 5.1 TypeScript
 
 End-to-end TS (NestJS + Next.js). Tipos expresan contratos; **no** validan datos externos ni permisos por sí solos. Validar formas de datos en límites (HTTP, persistencia) con **Zod**; validar en el cliente no autoriza.
