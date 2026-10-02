@@ -65,6 +65,18 @@ chore(git): update .gitignore to track local ODD tasks and refine versioning not
 feat(icon): add HisMia logo image file
 ```
 
+**Commits atómicos:** cada commit representa **una unidad de cambio coherente y verificable**. Un commit atómico:
+
+- Tiene un único propósito (una feature, un fix, un refactor, una corrección de docs). Mezclar cosas no relacionadas en un mismo commit es una falla.
+- Deja el repo en un estado ejecutable. Si el commit es de código, los tests deben estar verdes antes de cerrar el commit. Si es de docs, no debe romper enlaces, anclas ni formato.
+- Incluye su evidencia: tests, fixtures, migraciones, snippets de docs, ajustes de configuración que la unidad necesita para ser revisada y revertida de forma independiente.
+- Es revertible de un solo `git revert`. Si revertir el commit deja el repo roto, no era atómico.
+- **No** mezcla refactor con feature. Si tocás una regla de negocio y de paso “aprovechás” para renombrar, son dos commits.
+- **No** mezcla formato con lógica. Un cambio de prettier en archivos no tocados por la unidad va en un commit `style` aparte.
+- **No** amontilla WIP. Si una unidad requiere varios pasos, son varios commits, cada uno con su paso coherente, no un dump al cerrar.
+
+**Relación con PRs:** un PR puede contener uno o varios commits atómicos. El PR revisa la unidad de producto; los commits revisan la historia. Ambos tienen que ser coherentes.
+
 ### 3.3 Hooks locales
 
 - **Husky** puede correr lint/format antes de commit o push. No reemplaza CI ni garantiza seguridad.
