@@ -1,15 +1,23 @@
-import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { HealthController } from './health.controller.js';
-import { START_TIME, startTimeProvider } from './start-time.provider.js';
+import {
+  FastifyAdapter,
+  type NestFastifyApplication,
+} from '@nestjs/platform-fastify';
+import { HealthController } from './health.controller';
+import { START_TIME, startTimeProvider } from './start-time.provider';
 
-export function createTestApp(): Promise<INestApplication> {
-  return Test.createTestingModule({
+export async function createTestApp(): Promise<NestFastifyApplication> {
+  const moduleRef = await Test.createTestingModule({
     controllers: [HealthController],
     providers: [startTimeProvider],
   })
     .overrideProvider(START_TIME)
     .useValue({ getStartTime: () => new Date('2026-01-01T00:00:00Z') })
-    .compile()
-    .then((m) => m.createNestApplication());
+    .compile();
+
+  const adapter = new FastifyAdapter();
+  const app = moduleRef.createNestApplication<NestFastifyApplication>(adapter);
+  await app.init();
+  await app.getHttpAdapter().getInstance().ready();
+  return app;
 }

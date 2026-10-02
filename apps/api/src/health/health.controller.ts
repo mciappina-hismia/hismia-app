@@ -1,11 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import type { HealthResponse } from '@hismia/types';
-import type { StartTimeProvider } from './start-time.provider.js';
-import { START_TIME } from './start-time.provider.js';
+import { START_TIME, type StartTimeProvider } from './start-time.provider';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly startTime: InstanceType<StartTimeProvider>) {}
+  constructor(
+    @Inject(START_TIME) private readonly startTime: StartTimeProvider,
+  ) {}
 
   @Get()
   getHealth(): HealthResponse {

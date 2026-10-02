@@ -1,14 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { HealthResponse } from '@hismia/types';
 import { healthCheckSchema } from '@hismia/validation';
-import { createTestApp } from './test-utils.js';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createTestApp } from './test-utils';
 
 describe('HealthController (GET /health)', () => {
-  it('returns 200 with a payload accepted by the shared schema', async () => {
-    const app = await createTestApp();
+  let app: NestFastifyApplication;
 
-    const response = await request(app).get('/health').expect(200);
+  beforeEach(async () => {
+    app = await createTestApp();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('returns 200 with a payload accepted by the shared schema', async () => {
+    const response = await request(app.getHttpServer()).get('/health').expect(200);
 
     expect(response.body).toMatchObject({
       status: 'ok',
@@ -16,7 +25,7 @@ describe('HealthController (GET /health)', () => {
     });
     expect(typeof response.body.uptimeSeconds).toBe('number');
 
-    const parsed: HealthResponse = healthCheckSchema.parse(response.body);
+    const parsed: HealthResponse = healthCheckSchema.parse(response.body) as HealthResponse;
     expect(parsed.status).toBe('ok');
   });
 });
