@@ -6,7 +6,7 @@
     "dev": "next dev -p ${PORT:-3000}",
     "build": "next build",
     "test": "vitest run",
-    "lint": "next lint",
+    "lint": "eslint src --max-warnings=0",
     "start": "next start -p ${PORT:-3000}"
   },
   "dependencies": {
@@ -18,11 +18,14 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "eslint": "^9.17.0",
+    "eslint": "^8.57.1",
     "eslint-config-next": "^15.0.4",
+    "jsdom": "^25.0.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.5"
   }
