@@ -1,2 +1,37 @@
-# Local Pi runtime state
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Local Pi runtime state and generated indexes
 .atl/
+.codegraph/
+.project-graph-cache.json
+
+# Dependencies
+node_modules/
+
+# Build output and caches
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Local environment files (keep sanitized examples versioned)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Runtime and package-manager logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Documentation, icons, ODD tasks and lockfiles remain versioned.
