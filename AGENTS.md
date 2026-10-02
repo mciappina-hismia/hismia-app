@@ -188,6 +188,19 @@ La **política objetivo de `tsconfig.json`** (flags estrictos, buenas prácticas
 - **jose** para verificación JWT/JWKS contra el JWKS de Supabase; verificar el token **no** autoriza la historia clínica.
 - **node:crypto** (AES-256-GCM) candidato para cifrado de contenido cuando se implemente el backend; sigue siendo conceptual en este repo.
 
+**Estructura por endpoint / bounded context:** cada endpoint vive en una carpeta bajo `apps/api/src/<bounded-context>/`. Cuando un endpoint expone lógica de negocio, esa carpeta contiene este set mínimo de archivos (los nombres pueden sumar prefijos o sufijos según el contexto, p. ej. `patients.signup.controller.ts` si hace falta):
+
+| Archivo | Responsabilidad |
+|---|---|
+| `<endpoint>.types.ts` | Tipos TypeScript del contrato del endpoint (request, response, errores). |
+| `<endpoint>.service.ts` o `<bounded-context>.service.ts` | Lógica de negocio. Aggregate checks, orquestación de repositorios, reglas de autorización. |
+| `<endpoint>.controller.ts` | Solo rutea HTTP al service. No calcula nada. |
+| `<endpoint>.controller.spec.ts` | Tests unitarios del controller (mockean el service; verifican routing y delegación). |
+| `<endpoint>.service.spec.ts` o `<bounded-context>.service.spec.ts` | Tests del service con cada dependencia inyectada (DB, Auth, Storage, Sentry, etc.) mockeada. |
+| `<endpoint>.routes.spec.ts` | Tests e2e de las rutas reales con supertest contra la app Fastify. |
+
+Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service.ts` igual existe: la separación service/controller es la regla, no la excepción. Si el endpoint no tiene service, se está saltando la convención.
+
 ### 5.3 Frontend (Next.js)
 
 - **Next.js** = marco de aplicaciones web basado en React para las interfaces. Estrategia de renderizado, sesiones y versionado **no** decididos aún.
