@@ -4,12 +4,13 @@ import {
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import { HealthController } from './health.controller';
+import { HealthService } from './health.service';
 import { START_TIME, startTimeProvider } from './start-time.provider';
 
 export async function createTestApp(): Promise<NestFastifyApplication> {
   const moduleRef = await Test.createTestingModule({
     controllers: [HealthController],
-    providers: [startTimeProvider],
+    providers: [startTimeProvider, HealthService],
   })
     .overrideProvider(START_TIME)
     .useValue({ getStartTime: () => new Date('2026-01-01T00:00:00Z') })
