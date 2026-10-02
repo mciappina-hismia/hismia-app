@@ -153,7 +153,7 @@ El MVP se construye asumiendo que **mañana va a escalar** — más usuarios, m�
 - **Paginación obligatoria** en toda lista (historias, PDFs, notas, recordatorios, estadísticas institucionales). Límite máximo por request (ej. 100) más cursor estable. **Nunca** `SELECT *` sin paginar en una ruta que devuelva listas.
 - **Límites por tabla definidos desde el schema** (índices por clave de búsqueda, FKs explícitas, constraints de unicidad donde corresponda). No posponer índices "para cuando crezca": añadir un índice a una tabla con 100k filas en producción es caro; añadirlo con 100 filas es gratis.
 - **Cache solo cuando se justifique con un patrón de acceso real.** No añadir Redis el día 1 sin medir; el sobrecoste de invalidación mata más MVPs que la latencia. Si una ruta es lenta, medir antes de cachear.
-- **Archivos binarios (PDFs) fuera de la base de datos.** Storage gestionado (Supabase Storage, S3 o equivalente) desde el inicio; la BD guarda referencia + metadatos. Esto evita backups de BD que tardan horas y tablas que crecen sin control.
+- **Auth flow:** Supabase Auth emite el access token (JWT firmado). El backend solo verifica la firma contra el JWKS público de Supabase; nunca ve la contraseña ni la deriva. El frontend guarda el refresh token con seguridad del navegador.
 
 **Eje 2 — Equipo y features (escala organizacional):**
 
@@ -181,8 +181,11 @@ La **política objetivo de `tsconfig.json`** (flags estrictos, buenas prácticas
 ### 5.2 Backend (NestJS)
 
 - Responsabilidades separadas (hexagonal + SRP): controller no interpreta autorización; caso de uso aplica reglas; repositorio no decide permisos.
-- **Helmet** aplica cabeceras HTTP de seguridad; no sustituye autenticación ni autorización por recurso.
-- **jose** para JWT/JWS/JWE/JWK/JWKS si se requiere verificación local; verificar el token **no** autoriza la historia clínica.
+- **HTTP adapter: Fastify** vía `@nestjs/platform-fastify` (no Express). Más rápido, soporte nativo de JSON schema, mejor manejo de streams para PDFs.
+- **Helmet** vía `@fastify/helmet` aplica cabeceras HTTP de seguridad; no sustituye autenticación ni autorización por recurso.
+- **Rate-limit** vía `@fastify/rate-limit`: 100 req/min/IP por defecto en todos los endpoints, con override más estricto en `/login` y `/signup` (anti brute-force, configurable por env). Aplicado como hook global de Fastify en `main.ts`.
+- **Auth: Supabase Auth delegado.** El backend no maneja contraseñas ni hash. El frontend autentica contra Supabase Auth y envía el access token; el backend lo verifica contra el JWKS público de Supabase usando `jose`. Verificar un token no autoriza una historia clínica: el backend aplica las suyas propias sobre paciente, recurso, operación, vigencia y autoría.
+- **jose** para verificación JWT/JWKS contra el JWKS de Supabase; verificar el token **no** autoriza la historia clínica.
 - **node:crypto** (AES-256-GCM) candidato para cifrado de contenido cuando se implemente el backend; sigue siendo conceptual en este repo.
 
 ### 5.3 Frontend (Next.js)
