@@ -5,8 +5,27 @@ Estas descripciones presentan propósitos generales, no prueban que cada integra
 ## Aplicación y lenguaje
 
 - **[NestJS](https://docs.nestjs.com/):** marco para organizar aplicaciones de servidor, entradas HTTP y servicios. Su estructura no reemplaza las reglas de autorización por recurso.
-- **[Next.js](https://nextjs.org/docs):** marco de aplicaciones web basado en React para las interfaces. Aquí no se elige una estrategia de renderizado ni de sesiones.
+- **[Next.js - React](https://nextjs.org/docs):** marco de aplicaciones web basado en React para las interfaces. Aquí no se elige una estrategia de renderizado ni de sesiones.
+-  React Hook Form + resolvers
 - **[TypeScript](https://www.typescriptlang.org/docs/):** lenguaje con tipado estático para expresar contratos en código; los tipos no validan por sí solos datos externos ni permisos.
+- **[Helmet
+- **[jose
+
+
+ ## Metricas
+  - Supabase Dashboard para ver y analizar metricas desde el admin de Hismia
+
+
+## Cifrado de datos sensibles (selección conceptual)
+
+**[node:crypto](https://nodejs.org/api/crypto.html)** es un módulo integrado en Node.js, no un paquete npm que haya que instalar. Es candidato para cifrado autenticado **AES-256-GCM** en un futuro servidor; esta selección no implica seguridad implementada ni un backend ejecutable.
+
+- **Parámetros:** clave de 256 bits, nonce aleatorio de 96 bits que debe ser único por clave y etiqueta de autenticación de 128 bits. La implementación deberá evitar reutilizar nonces; si falla la autenticación, debe rechazar el dato sin entregar texto plano.
+- **Persistencia:** guardar texto cifrado, versión del formato/clave, nonce y etiqueta; los componentes binarios requieren `bytea` o un equivalente adecuado. El esquema y las migraciones siguen pendientes. Representar datos como binarios no los cifra.
+- **Claves:** mantenerlas fuera de la base de datos y del código fuente mediante un gestor de secretos o KMS. Definir versionado y rotación de claves; no registrar texto plano ni claves en logs.
+- **Contraseñas:** su hashing corresponde a Supabase Auth, no a este cifrado de contenido. No se propone un hash arbitrario de 126 bytes: hashing y cifrado tienen propósitos distintos.
+
+Siguen pendientes la clasificación de datos, la autorización de acceso y el alcance del cifrado en copias de respaldo y PDF. El cifrado no reemplaza controles de permisos ni resuelve por sí solo esos límites.
 
 ## Identidad, datos y estado
 
