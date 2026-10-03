@@ -12,11 +12,11 @@ MVP gradual con **50 cuentas iniciales**, ampliadas según mediciones hacia apro
 
 ### Acceso
 
-Registro directo. Diseñar onboarding seguro, verificación de identidad de cuenta y control de abuso; no autoconceder privilegios.
+Registro directo de pacientes, profesionales e instituciones, con verificación obligatoria del email de cuenta antes de habilitar el acceso para los tres tipos. El frontend autentica directamente con Supabase Auth; el backend nunca recibe contraseñas. Confirmar el email no concede autorización clínica, verificación profesional ni administración global. Diseñar onboarding seguro y control de abuso; no autoconceder privilegios.
 
 ### Paciente
 
-Ingresa su perfil privado, fecha de nacimiento para validar al menos 18 años y calcular edad estadística, género opcional (mujer, varón, no binario, otra identidad, prefiero no informar), localidad donde vive y su historia por PDF o texto. No inferir sexo clínico ni incluir género en el QR.
+Ingresa su perfil privado, fecha de nacimiento (día calendario) para validar al menos 18 años y calcular edad estadística; para nacidos un 29 de febrero, cuando el año del decimoctavo aniversario no es bisiesto sólo alcanzan la edad mínima el 1 de marzo, no el 28 de febrero. Género opcional (mujer, varón, no binario, otra identidad, prefiero no informar), localidad donde vive y su historia por PDF o texto. No inferir sexo clínico ni incluir género en el QR.
 
 Puede eliminar cualquier PDF de su propia historia, incluso uno cargado por un profesional, sin habilitar borrado de historias ajenas.
 
@@ -26,7 +26,7 @@ Ingresa nombre, especialidad y localidad donde ejerce en su perfil privado; pued
 
 ### Institución
 
-Se registra directamente como institución nueva con nombre, tipo y ubicación, sin aprobación de nadie; sólo consulta estadísticas agregadas de edad, género y horario **por institución**.
+Se registra directamente como una cuenta institucional única con nombre, tipo y ubicación, sin aprobación de nadie ni titular personal, equipo, membresías o invitaciones. Esto no implica compartir credenciales ni fija cuántas personas la operan; sólo consulta estadísticas agregadas de edad, género y horario **por institución** cuando se resuelvan sus bloqueos.
 
 Estadísticas solicitadas. Institución registra el evento de **ingreso** del paciente; la hora del ingreso no equivale a hora de atención ni de login. Definir si representa ingreso físico o a plataforma antes de instrumentarlo.
 
@@ -44,7 +44,7 @@ Lista cerrada: sin DNI, fecha de nacimiento, historias, notas, archivos médicos
 
 ### Membresía Pioneer
 
-Niveles BLACK, Platinum, Dorada y **Bronce** fijos en beta, múltiples miembros por nivel; asignación manual por administrador global.  Bronce contradice el canon actual de tres niveles; elegibilidad y beneficios exactos pendientes. Beneficios fijos (hardcodeados), sin editor administrativo, confirmado para beta; los valores concretos siguen pendientes: no activar derechos ni prometer pagos, descuentos, cuotas o privilegios clínicos ficticios. Ningún nivel concede autoridad clínica o administrativa.
+Niveles BLACK, Platinum, Dorada y **Bronce** fijos en beta, múltiples miembros por nivel; asignación manual por administrador global. Bronce contradice el canon actual de tres niveles; elegibilidad y beneficios exactos pendientes. Beneficios fijos (hardcodeados), sin editor administrativo, confirmado para beta; los valores concretos siguen pendientes: no activar derechos ni prometer pagos, descuentos, cuotas o privilegios clínicos ficticios. Ningún nivel concede autoridad clínica o administrativa.
 
 ### Recordatorios
 
@@ -70,7 +70,7 @@ Divulgación clínica excepcional y acotada, separada del grant profesional y co
 
 2. **Profesional:** crea cuenta propia y completa nombre, especialidad y localidad donde ejerce; solicita acceso al paciente; una solicitud por sí sola no concede permiso. Tras aceptación consulta sólo el PHR autorizado y agrega notas o PDF si el grant vigente permite cada operación. Edita exclusivamente sus propias notas mientras el grant siga activo, conservando versiones previas y auditoría; no edita notas ajenas, sustituye PDF ni elimina PDF del paciente. Tras revocación cesan lectura y escritura; las notas permanecen en la historia del paciente.
 
-3. **Institución:** crea directamente su propia institución con nombre, tipo y ubicación, sin aprobación de administrador ni otra persona. No obtiene administración global, acceso a instituciones ajenas ni PHR. Modelo titular/equipo e invitaciones técnicas pendiente. Estadísticas V1 de pacientes asociados a su institución bloqueadas hasta resolver atribución, fundamento/autorización estadística, definición del ingreso registrado por la institución y protección de celdas; no usar semillas de demostración.
+3. **Institución:** crea directamente una cuenta institucional única con nombre, tipo y ubicación, sin aprobación de administrador ni otra persona, titular personal, equipo, membresías o invitaciones. No se infiere uso compartido de credenciales ni cantidad de operadores. No obtiene administración global, acceso a instituciones ajenas ni PHR. Estadísticas V1 de pacientes asociados a su institución bloqueadas hasta resolver atribución, fundamento/autorización estadística, definición del ingreso registrado por la institución y protección de celdas; no usar semillas de demostración.
 
 4. **Administrador global:** accede a un dashboard privado con cantidades de cuentas total y por tipo, y datos básicos limitados a nombre, email de cuenta, tipo de usuario, localidad y estado de cuenta. No se muestra DNI, fecha de nacimiento ni información clínica. La asignación administrativa es separada: ni el alta pública ni los metadatos enviados por usuarios crean roles elevados o estado profesional verificado.
 
@@ -96,7 +96,7 @@ Esquema `professionals` exige `registrationNumber` y `jurisdiction`, con `verifi
 
 ### Perfil de la institución
 
-Nombre, tipo y ubicación; la observación heredada no prueba ausencia exhaustiva. Alta directa propia sin aprobación es decisión de producto; pertenencia titular/equipo y panel requieren autorización por institución aún por diseñar.
+Nombre, tipo y ubicación; la observación heredada no prueba ausencia exhaustiva. Alta directa de una sola cuenta institucional sin aprobación, titular personal, equipo, membresías ni invitaciones es decisión de producto; el panel requiere autorización por institución aún por diseñar.
 
 ## Discrepancia pendiente sobre PDF
 
@@ -116,9 +116,9 @@ Las unidades siguientes son planificación, **no trabajo completado**. Cada acep
 
 ### 2. Alta directa y perfiles propios
 
-- **Resultado:** paciente adulto (>=18), profesional e institución crean cuentas directas y editan sólo recursos propios; la institución nueva carga sus tres campos acordados sin aprobación de terceros.
+- **Resultado:** paciente adulto (>=18), profesional e institución crean cuentas directas con email de cuenta confirmado antes de acceder y editan sólo recursos propios; la institución nueva carga sus tres campos acordados sin aprobación de terceros ni modelo de titular/equipo.
 - **Reutilizar / crear:** adaptar el formulario de invitación y rutas de Auth sin exigir token; aprovechar esquema de perfiles y DTOs de paciente; añadir fecha de nacimiento persistida, validación de edad mínima 18, género opcional, especialidad, localidad de residencia/ejercicio, UI propia privada y alta institucional directa. Diseñar migración reversible para campos profesionales exigidos y pausa Beta 2 sin falsos datos. No confiar en rol solicitado por el cliente.
-- **Aceptar cuando:** el alta normal persista campos permitidos, se persista y valide fecha de nacimiento en alta y edición para edad adulta y métricas, y solicitudes de autoasignación de admin global/verified, de membresía de instituciones ajenas o perfiles ajenos sean rechazadas. Probar reversibilidad de esquema y preservar restricciones en entornos reales.
+- **Aceptar cuando:** se deniegue acceso a los tres tipos mientras su email no esté confirmado; confirmar email no conceda permisos clínicos, verificación profesional ni admin global; el alta normal persista campos permitidos, se persista y valide fecha de nacimiento en alta y edición para edad adulta y métricas, y solicitudes de autoasignación de admin global/verified, de membresía institucional o perfiles ajenos sean rechazadas. Probar reversibilidad de esquema y preservar restricciones en entornos reales.
 
 ### 3. Historia propia y PDF (datos reales solicitados; habilitación condicionada)
 
@@ -150,8 +150,8 @@ Las unidades siguientes son planificación, **no trabajo completado**. Cada acep
 ### 8. Estadísticas institucionales, condicionadas
 
 - **Resultado V1 confirmado, condicionado:** agregados de edad y género de pacientes asociados a la propia institución y hora del evento de **ingreso registrado por la institución**; no hora de atención ni login y no dataset de demostración. El alcance incluye además historias clínicas reales solicitadas, sin que eso autorice usar PHR para calcular o compartir métricas.
-- **Bloqueo V1:** definir contrato del evento de ingreso (físico o a plataforma), asociación mínima paciente-institución, quién registra y corrige ingresos, permisos de equipo y fuente de edad/género sin acceso institucional al PHR. Reconciliar la finalidad/autorización estadística y el consentimiento `institution_metrics_share` propuesto para V2 antes de operar métricas V1; no presumir consentimiento, exención legal por agregación ni que todos los pacientes de plataforma están disponibles para todas las instituciones. Ni grant clínico, alta propia, login o localidad equivalen a atribución o autorización. Definir supresión/minimización sin umbral inventado.
-- **Aceptar cuando:** esas decisiones estén resueltas y se prueben aislamiento institucional, acceso de miembros autorizados, autorización de finalidad, supresión de celdas conforme al contrato y rechazo de exportación identificable. Hasta entonces mantener el tablero V1 bloqueado; el resto del borrador no queda bloqueado.
+- **Bloqueo V1:** definir contrato del evento de ingreso (físico o a plataforma), asociación mínima paciente-institución, quién registra y corrige ingresos, autorización de la cuenta institucional y fuente de edad/género sin acceso institucional al PHR. Reconciliar la finalidad/autorización estadística y el consentimiento `institution_metrics_share` propuesto para V2 antes de operar métricas V1; no presumir consentimiento, exención legal por agregación ni que todos los pacientes de plataforma están disponibles para todas las instituciones. Ni grant clínico, alta propia, login o localidad equivalen a atribución o autorización. Definir supresión/minimización sin umbral inventado.
+- **Aceptar cuando:** esas decisiones estén resueltas y se prueben aislamiento institucional, acceso autorizado de la cuenta institucional, autorización de finalidad, supresión de celdas conforme al contrato y rechazo de exportación identificable. Hasta entonces mantener el tablero V1 bloqueado; el resto del borrador no queda bloqueado.
 
 ### 9. Dashboard administrativo privado
 
@@ -168,7 +168,7 @@ Las unidades siguientes son planificación, **no trabajo completado**. Cada acep
 ## Decisiones pendientes antes de ejecutar unidades afectadas
 
 1. **Métricas institucionales V1 (bloquea unidad 8):** datos clínicos reales y estadísticas V1 ya están solicitados; no reabrir esas opciones. Definir asociación mínima a institución, evento de ingreso institucional (físico o a plataforma), origen y corrección de edad/género, permisos y supresión. Reconciliar la autorización/finalidad de estadísticas V1 con `institution_metrics_share` y el consentimiento estadístico propuesto para V2; sin autorización acreditada no abrir el panel.
-2. **Pertenencia institucional y acceso (unidad 2):** alta directa de institución propia sin aprobación ya confirmada. Diseñar titular/equipo e invitaciones técnicas sin convertirlas en puerta de aprobación ni conferir admin global o PHR. Primer administrador global por configuración controlada, no por alta pública. Profesional beta también se registra directamente; identidad no verificada no significa permiso clínico automático.
+2. **Acceso institucional y email (unidad 2):** alta directa de una cuenta institucional única sin aprobación, titular personal, equipo, membresías ni invitaciones confirmada. No inferir credenciales compartidas ni cantidad de operadores. Email confirmado obligatorio antes de acceder para paciente, profesional e institución; no equivale a permisos clínicos, verificación profesional ni admin global. Primer administrador global por configuración controlada, no por alta pública.
 3. **Grant y versiones:** renovación decidida: nueva solicitud y aceptación después del vencimiento. Definir concurrencia entre revocación y operación, contrato de autor, propiedad paciente, scopes y eventos de edición/versionado. Sólo el autor profesional edita su nota con grant activo; las versiones permanecen en la historia.
 4. **Perfil profesional adicional:** cualquier campo más allá de nombre, especialidad y localidad se difiere; concretar catálogo y validaciones. Perfil paciente adulto exige fecha de nacimiento persistida y comprobación de edad >=18 sin reintroducir DNI.
 5. **Pioneer:** niveles BLACK, Platinum, Dorada y Bronce fijos en beta y asignación manual por administrador confirmados. Determinar elegibilidad y beneficios exactos; sin derechos activos hasta entonces. Beneficios fijos (hardcodeados) sin editor administrativo confirmados; valores concretos aún no decididos.
@@ -176,4 +176,3 @@ Las unidades siguientes son planificación, **no trabajo completado**. Cada acep
 7. **QR público:** formato opaco actualizable/desactivable y sólo datos DECLARADOS confirmados. Resolver revisión legal y privacidad de la ficha clínica pública de fase 13 antes de activar; usar datos reales en beta tampoco acredita idoneidad para emergencias o decisiones médicas. No agregar otros campos por inferencia.
 8. **Eliminación de PDF:** definir eliminación física, respaldos, retención y enlaces firmados, sin prometer purga instantánea.
 9. **Soporte y apertura:** el equipo usuario da soporte personalmente; canal y responsable operativo específico se documentarán sin inventarlos. Lote inicial de 50 cuentas, medición y ampliación gradual hacia unas 1.000 sin invitaciones obligatorias ni aprobación encubierta; definir criterios técnicos de pausa y capacidad observada antes de abrir.
-
