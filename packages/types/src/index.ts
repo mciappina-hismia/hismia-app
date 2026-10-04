@@ -39,3 +39,9 @@ export interface InstitutionProfileInput {
 /** Untrusted profile fields only; trusted identity is supplied separately by the server. */
 export type AccountProfileInput =
   PatientProfileInput | ProfessionalProfileInput | InstitutionProfileInput;
+
+/** Own persisted profile only; no identity context or account privileges. */
+export type PersistedProfile = AccountProfileInput & {
+  createdAt: string;
+  updatedAt: string;
+};

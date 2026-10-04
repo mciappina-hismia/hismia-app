@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { ProfilesModule } from './profiles/profiles.module';
 import { z } from 'zod';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
@@ -27,11 +28,12 @@ import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
 import { startTimeProvider } from './health/start-time.provider';
 
+// Export the existing single identity factory to guarded bounded contexts.
+@Global()
 @Module({
-  controllers: [HealthController, AuthController],
+  controllers: [AuthController],
+  exports: [AuthService, AuthGuard],
   providers: [
-    startTimeProvider,
-    HealthService,
     AuthGuard,
     {
       provide: AuthService,
@@ -44,5 +46,12 @@ import { startTimeProvider } from './health/start-time.provider';
       },
     },
   ],
+})
+export class IdentityModule {}
+
+@Module({
+  imports: [IdentityModule, ProfilesModule],
+  controllers: [HealthController],
+  providers: [startTimeProvider, HealthService],
 })
 export class AppModule {}

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { AppModule } from './app.module';
+import { PROFILE_REPOSITORY } from './profiles/profiles.repository';
 
 const originalEnv = { ...process.env };
 afterEach(() => {
@@ -21,7 +22,14 @@ function configure(mock: string | undefined) {
 describe('AppModule identity configuration', () => {
   it('boots with mock identity and no anon key', async () => {
     configure('true');
-    const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PROFILE_REPOSITORY)
+      .useValue({
+        createOrRead: () => {
+          throw new Error('No database in unit tests');
+        },
+      })
+      .compile();
     expect(module).toBeDefined();
     await module.close();
   });

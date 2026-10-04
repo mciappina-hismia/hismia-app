@@ -6,6 +6,8 @@ import { generateKeyPair, SignJWT } from 'jose';
 import { AppModule } from '../app.module';
 import { AuthService, fetchConfirmedUser } from './auth.service';
 
+import { PROFILE_REPOSITORY } from '../profiles/profiles.repository';
+
 const issuer = 'https://example.test/auth/v1';
 
 describe('auth routes', () => {
@@ -45,6 +47,10 @@ describe('auth routes', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(AuthService)
       .useValue({ authenticate: (jwt: string) => fetchConfirmedUser(jwt, deps) })
+      .overrideProvider(PROFILE_REPOSITORY)
+      .useValue({
+        createOrRead: vi.fn().mockRejectedValue(new Error('Synthetic unavailable storage')),
+      })
       .compile();
     app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     await app.init();
@@ -81,6 +87,11 @@ describe('auth routes', () => {
       .set('Authorization', `Bearer ${await token()}`)
       .expect(401);
     expect(result.body.code).toBe('AUTH_DENIED');
+    await request(app.getHttpServer())
+      .post('/profiles/onboarding')
+      .set('Authorization', `Bearer ${await token()}`)
+      .send({ accountType: 'institution', name: 'Synthetic', type: 'Test', location: 'Test' })
+      .expect(401);
   });
   it.each([
     ['expired', { exp: 1 }],
