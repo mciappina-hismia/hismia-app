@@ -2,16 +2,18 @@
   "name": "@hismia/validation",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "test": "vitest run",
     "lint": "eslint src --max-warnings=0",
-    "build": "tsc --noEmit"
+    "build": "tsc"
   },
   "dependencies": {
     "zod": "^3.23.8"
