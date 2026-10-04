@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["profile_private"]
+}
+
+enum AccountType {
+  patient
+  professional
+  institution
+
+  @@schema("profile_private")
+}
+
+model Profile {
+  subject           String      @id @db.Text
+  accountType       AccountType
+  displayName       String?     @db.Text
+  birthDate         DateTime?   @db.Date
+  gender            String?     @db.Text
+  residenceLocality String?     @db.Text
+  specialty         String?     @db.Text
+  practiceLocality  String?     @db.Text
+  name              String?     @db.Text
+  type              String?     @db.Text
+  location          String?     @db.Text
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@map("profiles")
+  @@schema("profile_private")
+}
