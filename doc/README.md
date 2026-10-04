@@ -12,7 +12,7 @@ MVP gradual con **50 cuentas iniciales**, ampliadas según mediciones hacia apro
 
 ### Acceso
 
-Registro directo de pacientes, profesionales e instituciones, con verificación obligatoria del email de cuenta antes de habilitar el acceso para los tres tipos. El frontend autentica directamente con Supabase Auth; el backend nunca recibe contraseñas. Confirmar el email no concede autorización clínica, verificación profesional ni administración global. Diseñar onboarding seguro y control de abuso; no autoconceder privilegios.
+Registro directo de pacientes, profesionales e instituciones, con verificación obligatoria del email de cuenta antes de habilitar el acceso para los tres tipos. Tras confirmar el enlace, una sesión válida y un email confirmado permiten pasar automáticamente al onboarding; sin sesión válida (por ejemplo, si se abrió el enlace en otro navegador o venció), se solicita ingreso con email y contraseña antes de continuar. La selección de tipo durante el registro es sólo una preferencia de onboarding, nunca autoridad. El frontend autentica directamente con Supabase Auth; el backend nunca recibe contraseñas. Confirmar el email no concede autorización clínica, verificación profesional ni administración global. Diseñar onboarding seguro y control de abuso; no autoconceder privilegios.
 
 ### Paciente
 
