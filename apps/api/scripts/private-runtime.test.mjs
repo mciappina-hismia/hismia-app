@@ -612,6 +612,81 @@ test('API-only start uses child env, never credentials in argv, suppresses logs 
   assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
   assert.deepEqual(f.output, ['FAIL API_EXIT']);
 });
+const lifecycleMetadata = {
+  npm_config_user_agent: 'pnpm/10.0.0 npm/? node/v22.0.0 linux x64',
+  npm_config_recursive: 'true',
+  NODE_ENV: 'development',
+};
+test('start accepts narrow lifecycle metadata but never forwards it to the child', async () => {
+  for (const metadata of [
+    ...Object.entries(lifecycleMetadata).map(([key, value]) => ({ [key]: value })),
+    lifecycleMetadata,
+  ]) {
+    const f = checker();
+    Object.assign(f.deps.env, metadata, { PATH: '/synthetic/bin', HOME: '/synthetic/home' });
+    let childEnv;
+    f.deps.spawn = async (_command, _args, options) => {
+      childEnv = options.env;
+      return 0;
+    };
+    assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 0);
+    assert.deepEqual(f.output, ['PASS API_EXIT']);
+    assert.deepEqual(childEnv, {
+      PATH: '/synthetic/bin',
+      HOME: '/synthetic/home',
+      NODE_ENV: 'development',
+      DATABASE_URL: helper.runtimeUrl(password),
+    });
+    assert.equal(f.options(), undefined);
+  }
+});
+test('lifecycle metadata does not mask missing synthetic private configuration', async () => {
+  const f = checker();
+  Object.assign(f.deps.env, lifecycleMetadata);
+  f.files.delete(file);
+  f.deps.spawn = () => assert.fail('must not spawn');
+  assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
+  assert.deepEqual(f.output, ['FAIL IO_CONFIG_MISSING']);
+  assert.equal(f.options(), undefined);
+});
+test('dangerous and unknown overrides reject before any IO or effects without value leaks', async () => {
+  const overrides = [
+    ['NODE_ENV', 'production'], ['NODE_ENV', 'test'], ['NODE_ENV', ''],
+    ['NODE_ENV', 'Development'], ['NODE_ENV', 'development '],
+    ...[
+      'NODE_OPTIONS', 'NODE_PATH', 'NODE_EXTRA_CA_CERTS', 'NODE_TLS_REJECT_UNAUTHORIZED',
+      'NODE_UNKNOWN', 'npm_config_node_options', 'npm_config_script_shell',
+      'npm_config_registry', 'npm_config_userconfig', 'npm_config_unknown',
+      'npm_config_user_agent_extra', 'NPM_CONFIG_USER_AGENT', 'NPM_CONFIG_NODE_OPTIONS',
+      'DATABASE_URL', 'DIRECT_URL', 'PGOPTIONS', 'PRISMA_ENGINE_BINARY',
+      'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DEBUG', 'RUST_LOG', 'SSL_CERT_FILE',
+      'AUTH_USE_MOCK',
+    ].map((key) => [key, 'synthetic_override_never_output']),
+  ];
+  for (const args of [
+    ['start', '--ack-api-listener'], ['check', '--ack-remote-read-only'],
+    ['prepare'], ['configure-ca', '--ack-ca-config', '/synthetic/ca.crt'],
+  ]) {
+    for (const [key, value] of overrides) {
+      const f = checker();
+      Object.assign(f.deps.env, lifecycleMetadata, { [key]: value });
+      for (const method of Object.keys(f.deps.io))
+        f.deps.io[method] = () => {
+          f.events.push(['forbidden-io', method]);
+          assert.fail(`must not perform IO: ${method}`);
+        };
+      f.deps.spawn = () => {
+        f.events.push(['forbidden-spawn']);
+        assert.fail('must not spawn');
+      };
+      assert.equal(await helper.run(args, f.deps), 1, `${args[0]} ${key}`);
+      assert.deepEqual(f.output, [args[0] === 'prepare' ? 'FAIL PREPARE' : 'FAIL CONFIG']);
+      assert.deepEqual(f.events, []);
+      assert.equal(f.options(), undefined);
+      if (value) assert.ok(!f.output.join('').includes(value));
+    }
+  }
+});
 test('start requires the API-local executable and never falls back to root or global Nest', async () => {
   const f = checker();
   const local = `${api}/node_modules/.bin/nest`;
