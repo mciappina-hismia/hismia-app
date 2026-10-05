@@ -10,6 +10,7 @@ afterEach(() => {
 
 function configure(mock: string | undefined) {
   process.env.NODE_ENV = 'test';
+  process.env.APP_CONFIG_SKIP_INIT = '1';
   process.env.SUPABASE_PROJECT_URL = 'https://example.test';
   process.env.SUPABASE_JWKS_URL = 'https://example.test/.well-known/jwks.json';
   process.env.SUPABASE_ISSUER = 'https://example.test/auth/v1';

@@ -115,6 +115,30 @@ que `git config core.hooksPath` devuelva `.husky/_/`.
 - Describir **qué** y **por qué**, enlazar a la tarea ODD correspondiente.
 - **No mergear sin revisión.** Para áreas sensibles (autorización, auth, pagos, seguridad, migraciones, contratos públicos) correr las 4R (`review-risk`, `review-resilience`, `review-readability`, `review-reliability`).
 
+### 3.5 Setup local del API
+
+Para arrancar `apps/api` localmente:
+
+1. `node apps/api/scripts/dev-setup.mjs prepare` (una vez; requiere TTY).
+   Crea `apps/api/.env.runtime.local` con el `DATABASE_URL` y
+   `apps/api/.env.runtime.provision.sql` con el SQL de provisioning, ambos
+   `0o600`. **No** imprimir, commitear ni pegar ninguno en chat: el
+   verifier es una credencial.
+2. Ejecutar el SQL del paso 1 en el editor SQL privado del dashboard
+   de Supabase autorizado (`hismia-dev` / `zfpnjsbxrgbcehmefozb`).
+3. `node apps/api/scripts/dev-setup.mjs configure-ca --ack-ca-config
+/ruta/absoluta/al/ca.crt` (una vez; tras `prepare`). Pinea el CA
+   estricto de Supabase en el archivo privado.
+4. `pnpm --filter @hismia/api dev` (cada vez). Arranca el API; el
+   `AppConfigModule` valida el archivo privado (URL canonical,
+   fingerprint del CA, conectividad de DB read-only) en su
+   `OnModuleInit`. Si algo falla, throw → exit 1.
+
+Los archivos `.env.runtime.*` están en `.gitignore` (`/apps/api/...`).
+A diferencia del helper anterior (`private-runtime.mjs`, eliminado),
+Nest arranca con el `process.env` completo del operador: variables
+benignas como `NODE_OPTIONS=--no-deprecation` ya no rompen el flujo.
+
 ## 4. Trabajo con agentes AI
 
 ### 4.1 Lectura obligatoria antes de actuar

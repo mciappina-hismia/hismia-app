@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthService } from './auth/auth.service';
+import { AppConfigModule } from './app-config/app-config.module.js';
 
 export const authEnvSchema = z
   .object({
@@ -50,7 +51,7 @@ import { startTimeProvider } from './health/start-time.provider';
 export class IdentityModule {}
 
 @Module({
-  imports: [IdentityModule, ProfilesModule],
+  imports: [AppConfigModule, IdentityModule, ProfilesModule],
   controllers: [HealthController],
   providers: [startTimeProvider, HealthService],
 })
