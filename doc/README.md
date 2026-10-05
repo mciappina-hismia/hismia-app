@@ -4,9 +4,17 @@ Este documento conserva el alcance y los bloqueos existentes; [ARQUITECTURA.md](
 
 ## Estado de implementación de la unidad 2 (no modifica el alcance)
 
-- **Implementado en código:** T1, contratos compartidos y validación de edad adulta; T2, identidad confirmada en API; T4a, alta, ingreso y confirmación PKCE en frontend. El flujo T4a usa sesión persistida por el SDK en el navegador; no implica SSR ni cookies HttpOnly.
-- **Sin aceptación integral:** T3 tiene fuente de persistencia, pero faltan conexión con TLS estricto y prueba integrada. T4b no recopila ni guarda perfiles: el onboarding actual es un placeholder. T5, lectura y edición de perfiles propios, queda excluido de esta recuperación.
-- **Evidencia limitada:** la entrega en `develop` mediante merge `074994f` no acredita aceptación completa. Históricamente, 50/50 tests de frontend y lint independiente pasaron; el lint incorporado al build de Next falló. No hay prueba de integración real ni verificación en navegador. Las condiciones de aceptación de las unidades propuestas más abajo siguen vigentes; el seguimiento operativo local está en `odd/tasks/auth-only-mvp-2.md` (no publicado en Git).
+> **Convención de estado:** cada ítem separa **implementado en código** (existe en el árbol y compila) de **aceptado integralmente** (cumple criterios de aceptación end-to-end, con evidencia integrada registrada en la tarea ODD). Mientras no haya evidencia integrada del flujo completo, el ítem se considera **implementado pendiente de aceptación**.
+
+- **Implementado en código, pendiente de aceptación integral:**
+  - **T1** — Contratos compartidos y validación de edad adulta en `packages/validation`.
+  - **T2** — Identidad confirmada en `apps/api` (JWT + email confirmado).
+  - **T3** — Fuente de persistencia con schema privado y RLS por sujeto; **sin evidencia integrada** de conexión con TLS estricto ni prueba de punta a punta.
+  - **T4a** — Alta, ingreso y confirmación PKCE en frontend; sesión persistida por el SDK del navegador (sin SSR ni cookies HttpOnly).
+  - **T4b** — Onboarding con recolección, validación y persistencia de perfil propio vía el contrato compartido. Pendiente: verificación integrada con la DB restringida, escenarios cross-subject denial, email no confirmado, fechas de mayoría de edad y reinicio de proceso.
+- **Excluido de esta recuperación:** **T5** (lectura y edición de perfiles propios).
+- **Sin implementar ni admisión:** grants, autorización por recurso, verificación profesional y admin/clinical-admin.
+- **Evidencia limitada:** la entrega en `develop` mediante merge `074994f` no acredita aceptación completa. 50/50 tests de frontend y lint independiente pasaron históricamente; el lint incorporado al build de Next falló. No hay prueba de integración real ni verificación en navegador. Las condiciones de aceptación de las unidades propuestas más abajo siguen vigentes; el seguimiento operativo local está en `odd/tasks/auth-only-mvp-2.md` (no publicado en Git).
 
 ## Resultado buscado
 

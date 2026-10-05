@@ -44,6 +44,19 @@ Siguen pendientes la clasificación de datos, la autorización de acceso y el al
 - **[Supabase](https://supabase.com/docs):** plataforma que ofrece servicios de backend; su mención no implica elegir almacenamiento de archivos, tiempo real, funciones, alojamiento ni acceso directo del navegador a datos clínicos.
 - **[Supabase Auth](https://supabase.com/docs/guides/auth):** gestiona autenticación e identidad de cuenta. **El backend de Hismia delega Auth a Supabase**: no maneja contraseñas ni hash. El frontend autentica contra Supabase Auth y envía el access token (JWT); el backend lo verifica contra el JWKS público de Supabase usando `jose`. Autenticarse no autoriza una historia clínica: propietario, grant, alcance, vigencia y autoría requieren verificaciones separadas en el backend de Hismia.
 - **[Prisma](https://www.prisma.io/docs):** herramienta para modelar y consultar datos persistentes. Persistir o leer mediante Prisma no propaga automáticamente grants de usuario ni garantiza la aplicación de políticas RLS; las fronteras efectivas de autorización deben comprobarse para cada ruta de acceso. La fuente de persistencia de la unidad 2 existe, pero puede aceptar una URL de conexión insegura: no constituye una arquitectura TLS estricta aceptada ni prueba conexión integrada.
+
+### Criterio de aceptación: TLS estricto en conexiones a la base de datos
+
+La mera presencia de una capa TLS no cumple la política de Hismia. El estado real de la unidad 2 sólo se considera **aceptado** cuando **todos** los puntos siguientes se cumplen y quedan registrados como evidencia en la tarea ODD:
+
+- **`sslmode=require`** presente en la URL de conexión rechazada por el helper `apps/api/scripts/private-runtime.mjs` (ver `runtimeUrl` y `parseConfig`). Aceptar este modo es el mínimo; nunca se acepta `sslmode=disable` ni `sslmode=prefer`.
+- **`sslaccept=strict`** activado: el cliente verifica la cadena de certificación completa y rechaza certificados que no anclen al pin del proyecto.
+- **CA pinneada** en el helper (`CA_PIN` en `apps/api/scripts/private-runtime.mjs`) y comparada por fingerprint SHA-256 del certificado del servidor en cada conexión; la diferencia entre el fingerprint certificado y la fecha de validez actual es detectada por `validateCa`.
+- **Prisma** honra los flags anteriores sin degradarlos. La inicialización del cliente no debe pasar por variables de entorno que anulen `sslmode`, `sslaccept` ni el `sslcert`.
+- **Test integrado** ejecutado contra la DB restringida del perfil privado: el helper emite `PASS CHECK` y la app inicia el listener; un test que conecta sin TLS o con TLS laxo debe **fallar** (no-warning, no-skip).
+- **Renovación documentada** del CA pin: ante cambio de certificado, se actualiza `CA_PIN` y se reejecuta la prueba integrada; el commit incluye la nota de rotación.
+
+Cualquier desvío (helper que acepta `sslmode=disable`, pruebas saltadas con `--ignore-tls`, URL sin `sslcert`, Prisma reconfigurado sin verificar) invalida la aceptación de T3, aunque el código compile y los tests sintéticos pasen.
 - **[Zustand](https://zustand.docs.pmnd.rs/):** gestiona estado de interfaz en el cliente; ese estado no constituye autoridad sobre permisos.
 
 ## Validación, presentación y pruebas

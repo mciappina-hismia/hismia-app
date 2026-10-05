@@ -247,6 +247,15 @@ Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service
 - Glue code trivial que solo delega a una librería probada por su mantenedor.
 - Cuando el runner todavía no está configurado en el módulo tocado: explicar la excepción en la tarea ODD y diferir el test a una unidad de trabajo inmediata.
 
+**Rúbrica mínima de unidad cerrada.** Toda unidad de trabajo (commit) cierra con, como mínimo:
+- **Ruta de código tocada** (path:line) y **ruta de test** que cubre el comportamiento nuevo o modificado.
+- **Evidencia RED → GREEN → REFACTOR** observada (comando exacto y resultado), o justificación explícita de la excepción.
+- **Evidencia integrada** cuando se trate de autorización, persistencia, JWT o contratos públicos: un test contra la app real (supertest o equivalente) y, si aplica, contra la base restringida con la política esperada.
+- **Doc tocada** (path:line) si hay cambio conceptual, de contrato o de política visible.
+- **Riesgo residual y criterio de rollback** nombrados en la tarea ODD.
+
+Si falta cualquiera de estos campos, el commit **no** está listo para cerrar y debe reabrirse con un nuevo RED que cubra el hueco.
+
 **Convenciones de la suite:**
 
 - **Archivos:** la convención canónica en todo el monorepo es `*.test.ts`, co-localizado con el código o en `__tests__/` por módulo; mismo criterio en `apps/api/`, `apps/front/` y `packages/`. La tabla de endpoints de §5.2 ya referencia esta convención.
@@ -255,6 +264,8 @@ Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service
 - **Cobertura:** no es criterio de aceptación; sí lo es la presencia de tests sobre las reglas críticas (autorización, grants, autoría, validación).
 - **A11y:** axe-core en CI se delega a Task 16.163; contract tests a Task 0.36 (ver `doc/DESIGN/DESIGN.md`).
 - **Evidencia:** registrar en la tarea ODD el comando ejecutado (`pnpm vitest run`, `node --test`) y su resultado; nunca inventar RED/GREEN.
+
+**Política de errores y diagnosabilidad.** Prohibido catch-alls que aplasten clases de error a un único tipo genérico (`unavailable`, `generic`, `internal`). Cada bounded context mapea sus errores a una jerarquía explícita (`ValidationError`, `ConflictError`, `NotFoundError`, `TransientError`) y los traduce a HTTP con códigos por contexto. Los repositorios propagan la clase original; el servicio decide la traducción. **No** se loguean JWT, payloads crudos, contraseñas ni identificadores clínicos.
 
 **Relación con la entrega:** cada unidad de trabajo (commit) cierra con tests y docs junto al comportamiento. La verificación proporcional es siempre obligatoria; la ausencia de tests aplicables se documenta, no se omite.
 

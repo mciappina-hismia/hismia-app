@@ -704,7 +704,81 @@ test('legacy transaction TLS bypass is rejected before any child or client launc
   assert.throws(() => helper.runtimeUrl(password, undefined, 'tx'));
   assert.throws(() => helper.parseConfig(`DATABASE_URL=${insecure}\n`));
 });
+test('start categorizes missing or unreadable private config without leaking paths', async () => {
+  requireHelper();
+  for (const change of [
+    'env-missing',
+    'env-denied',
+    'ca-missing',
+    'ca-denied',
+    'nest-missing',
+    'nest-denied',
+  ]) {
+    const f = checker();
+    const expected = {
+      'env-missing': 'FAIL IO_CONFIG_MISSING',
+      'env-denied': 'FAIL IO_CONFIG_DENIED',
+      'ca-missing': 'FAIL IO_CA_MISSING',
+      'ca-denied': 'FAIL IO_CA_DENIED',
+      'nest-missing': 'FAIL IO_NEST_MISSING',
+      'nest-denied': 'FAIL IO_NEST_DENIED',
+    }[change];
+    const err = (code) => Object.assign(new Error('private'), { code });
+    if (change === 'env-missing') {
+      const lstat = f.deps.io.lstat;
+      f.deps.io.lstat = async (p) => {
+        if (p === file) throw err('ENOENT');
+        return lstat(p);
+      };
+    }
+    if (change === 'env-denied') {
+      const lstat = f.deps.io.lstat;
+      f.deps.io.lstat = async (p) => {
+        if (p === file) throw err('EACCES');
+        return lstat(p);
+      };
+    }
+    if (change === 'ca-missing') {
+      const ca = '/checkout/missing-ca.crt';
+      const pem =
+        '-----BEGIN CERTIFICATE-----\n' + 'A'.repeat(600) + '\n-----END CERTIFICATE-----\n';
+      f.files.set(ca, { stat: stat({ size: pem.length }), content: pem });
+      f.files.get(file).content = `DATABASE_URL=${helper.runtimeUrl(password, ca)}\n`;
+      const lstat = f.deps.io.lstat;
+      f.deps.io.lstat = async (p) => {
+        if (p === ca) throw err('ENOENT');
+        return lstat(p);
+      };
+    }
+    if (change === 'ca-denied') {
+      const ca = '/checkout/denied-ca.crt';
+      const pem =
+        '-----BEGIN CERTIFICATE-----\n' + 'A'.repeat(600) + '\n-----END CERTIFICATE-----\n';
+      f.files.set(ca, { stat: stat({ size: pem.length }), content: pem });
+      f.files.get(file).content = `DATABASE_URL=${helper.runtimeUrl(password, ca)}\n`;
+      const lstat = f.deps.io.lstat;
+      f.deps.io.lstat = async (p) => {
+        if (p === ca) throw err('EACCES');
+        return lstat(p);
+      };
+    }
+    if (change === 'nest-missing') {
+      f.deps.io.access = async () => {
+        throw err('ENOENT');
+      };
+    }
+    if (change === 'nest-denied') {
+      f.deps.io.access = async () => {
+        throw err('EACCES');
+      };
+    }
+    f.deps.spawn = () => assert.fail('must not spawn');
+    assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
+    assert.deepEqual(f.output, [expected]);
+  }
+});
 test('config is data, not shell code, including at the dev entrypoint', async () => {
+  requireHelper();
   const f = checker();
   f.files.get(file).content =
     `DATABASE_URL=${helper.runtimeUrl(password)};$(touch /synthetic-marker)\n`;
