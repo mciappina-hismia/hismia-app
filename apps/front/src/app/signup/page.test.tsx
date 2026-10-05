@@ -24,12 +24,28 @@ afterEach(cleanup);
 
 function submit(type: string): void {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.test' } });
-  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
-  fireEvent.change(screen.getByLabelText(/Account type/), { target: { value: type } });
+  fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'test-password' } });
+  fireEvent.change(screen.getByLabelText(/Tipo de cuenta/), { target: { value: type } });
   fireEvent.click(screen.getByRole('button', { name: 'Crear Cuenta' }));
 }
 
 describe('direct signup', () => {
+  it('auth presentation explains account preference and preserves the existing login route', () => {
+    render(<Signup />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Crear Cuenta' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Iniciar Sesión' })).toHaveAttribute('href', '/login');
+    expect(screen.getByLabelText('Contraseña')).toHaveAttribute('autoComplete', 'new-password');
+    expect(screen.getByRole('combobox', { name: 'Tipo de cuenta' })).toHaveAccessibleDescription(
+      'Esta es una preferencia de onboarding, no un permiso o rol verificado.',
+    );
+    expect(screen.getAllByRole('option').map((option) => option.getAttribute('value'))).toEqual([
+      '',
+      'patient',
+      'professional',
+      'institution',
+    ]);
+    expect(signUp).not.toHaveBeenCalled();
+  });
   it.each(['patient', 'professional', 'institution'])(
     'requests confirmation for %s without asserting a role or bypassing pending',
     async (type) => {
@@ -44,7 +60,7 @@ describe('direct signup', () => {
       expect(
         await screen.findByText(/check your email for a confirmation link/i),
       ).toBeInTheDocument();
-      expect(screen.getByLabelText('Password')).toHaveValue('');
+      expect(screen.getByLabelText('Contraseña')).toHaveValue('');
       expect(window.sessionStorage.getItem('hismia.onboarding.accountType')).toBe(type);
     },
   );
@@ -57,7 +73,7 @@ describe('direct signup', () => {
     expect(screen.getByRole('status')).not.toHaveTextContent(
       /check your email for a confirmation link/i,
     );
-    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText('Contraseña')).toHaveValue('');
     expect(window.sessionStorage.getItem('hismia.onboarding.accountType')).toBeNull();
   });
 
@@ -86,7 +102,7 @@ describe('direct signup', () => {
     );
     render(<Signup />);
     submit('patient');
-    fireEvent.submit(screen.getByRole('button', { name: /please wait/i }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: /por favor, espere/i }).closest('form')!);
     expect(signUp).toHaveBeenCalledOnce();
     finish?.({ data: { session: null }, error: null });
     expect(

@@ -22,15 +22,24 @@ afterEach(cleanup);
 
 function submit(): void {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.test' } });
-  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'test-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sesión' }));
 }
 
 describe('returning login', () => {
+  it('auth presentation offers labeled sign-in fields and the existing signup route', () => {
+    render(<Login />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Iniciar Sesión' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Crear Cuenta' })).toHaveAttribute('href', '/signup');
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'email');
+    expect(screen.getByLabelText('Contraseña')).toHaveAttribute('autoComplete', 'current-password');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
   it('rejects malformed input without calling Auth', () => {
     render(<Login />);
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'short' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sesión' }));
     expect(signInWithPassword).not.toHaveBeenCalled();
   });
   it('keeps a single pending password request', async () => {
@@ -43,7 +52,7 @@ describe('returning login', () => {
     );
     render(<Login />);
     submit();
-    fireEvent.submit(screen.getByRole('button', { name: /please wait/i }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: /por favor, espere/i }).closest('form')!);
     expect(signInWithPassword).toHaveBeenCalledOnce();
     finish?.({ error: new Error('synthetic') });
     expect(await screen.findByText(/sign-in unavailable/i)).toBeInTheDocument();
@@ -64,6 +73,6 @@ describe('returning login', () => {
       email: 'person@example.test',
       password: 'test-password',
     });
-    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText('Contraseña')).toHaveValue('');
   });
 });
