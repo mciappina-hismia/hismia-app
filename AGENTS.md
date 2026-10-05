@@ -38,7 +38,7 @@ Las reglas conceptuales viven en [`doc/README.md`](doc/README.md) y [`doc/ARQUIT
 └── .atl/            Registro de skills del proyecto
 ```
 
-- **`api/` y `front/`** se desarrollan como módulos independientes; nada en `front/` accede directo a datos clínicos sin pasar por el backend.
+- **`apps/api/` y `apps/front/`** se desarrollan como módulos independientes; nada en `apps/front/` accede directo a datos clínicos sin pasar por el backend.
 - **`doc/`** es la fuente de verdad conceptual. Cambios al producto se documentan **primero** ahí.
 - **`odd/tasks/`** guarda una nota por feature mientras dura el trabajo; al cerrar se conserva como evidencia.
 
@@ -195,9 +195,9 @@ La **política objetivo de `tsconfig.json`** (flags estrictos, buenas prácticas
 | `<endpoint>.types.ts` | Tipos TypeScript del contrato del endpoint (request, response, errores). |
 | `<endpoint>.service.ts` o `<bounded-context>.service.ts` | Lógica de negocio. Aggregate checks, orquestación de repositorios, reglas de autorización. |
 | `<endpoint>.controller.ts` | Solo rutea HTTP al service. No calcula nada. |
-| `<endpoint>.controller.spec.ts` | Tests unitarios del controller (mockean el service; verifican routing y delegación). |
-| `<endpoint>.service.spec.ts` o `<bounded-context>.service.spec.ts` | Tests del service con cada dependencia inyectada (DB, Auth, Storage, Sentry, etc.) mockeada. |
-| `<endpoint>.routes.spec.ts` | Tests e2e de las rutas reales con supertest contra la app Fastify. |
+| `<endpoint>.controller.test.ts` | Tests unitarios del controller (mockean el service; verifican routing y delegación). |
+| `<endpoint>.service.test.ts` o `<bounded-context>.service.test.ts` | Tests del service con cada dependencia inyectada (DB, Auth, Storage, Sentry, etc.) mockeada. |
+| `<endpoint>.routes.test.ts` | Tests e2e de las rutas reales con supertest contra la app Fastify. |
 
 Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service.ts` igual existe: la separación service/controller es la regla, no la excepción. Si el endpoint no tiene service, se está saltando la convención.
 
@@ -206,7 +206,7 @@ Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service
 - **Next.js** = marco de aplicaciones web basado en React para las interfaces. Estrategia de renderizado, sesiones y versionado **no** decididos aún.
 - **React Hook Form + @hookform/resolvers** para formularios; integrar con Zod como esquema.
 - **Zustand** para estado de UI; no es autoridad sobre permisos.
-- **Tailwind CSS v4 + shadcn/ui** (cuando se inicialice el frontend); los tokens viven en `doc/DESIGN/DESIGN.md` como fuente única.
+- **Tailwind CSS v4 + shadcn/ui** (pendiente de inicializar en `apps/front/`); los tokens viven en `doc/DESIGN/DESIGN.md` como única fuente y aún no se exportan a `tailwind.config.*`. `next-themes` y `apps/front/src/app/globals.css` también están pendientes.
 
 ### 5.4 Persistencia
 
@@ -249,7 +249,7 @@ Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service
 
 **Convenciones de la suite:**
 
-- **Archivos:** `*.test.ts` co-localizado con el código o en `__tests__/` por módulo; mismo criterio en `api/` y `front/`.
+- **Archivos:** la convención canónica en todo el monorepo es `*.test.ts`, co-localizado con el código o en `__tests__/` por módulo; mismo criterio en `apps/api/`, `apps/front/` y `packages/`. La tabla de endpoints de §5.2 ya referencia esta convención.
 - **Datos clínicos:** **nunca** en fixtures. Usar datos sintéticos, factories y anonimización. Las historias clínicas reales son out-of-scope hasta habilitación explícita.
 - **Mocks:** solo en límites (HTTP, persistencia, tiempo). No mockear la lógica que se está probando.
 - **Cobertura:** no es criterio de aceptación; sí lo es la presencia de tests sobre las reglas críticas (autorización, grants, autoría, validación).

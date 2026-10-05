@@ -49,7 +49,7 @@ Siguen pendientes la clasificación de datos, la autorización de acceso y el al
 ## Validación, presentación y pruebas
 
 - **[Zod](https://zod.dev/):** describe y valida formas de datos en límites apropiados; validar datos en el cliente no otorga autorización y no reemplaza controles de servidor.
-- **[Tailwind CSS](https://tailwindcss.com/docs):** utilidades para estilos de interfaz.
+- **[Tailwind CSS](https://tailwindcss.com/docs):** utilidades para estilos de interfaz. La adopción de Tailwind v4 en `apps/front/` (junto con `shadcn/ui` y la exportación de tokens desde [`doc/DESIGN/DESIGN.md`](../DESIGN/DESIGN.md)) está **pendiente de inicialización**; no hay `tailwind.config.*` ni `apps/front/src/app/globals.css` todavía. `next-themes` y `@hismia/ui` también están pendientes.
 - **[shadcn/ui](https://ui.shadcn.com/docs):** componentes y patrones de interfaz; su presencia no define accesibilidad ni comportamientos específicos del producto.
 - **[Vitest](https://vitest.dev/):** runner principal para tests unitarios y de integración. Aprovecha la configuración de Vite/tsconfig, soporta ESM nativo y TypeScript sin paso extra de compilación. La estrategia RED → GREEN → REFACTOR se aplica sobre Vitest; ver [AGENTS.md](../AGENTS.md) §5.6.
 - **[Node test runner](https://nodejs.org/api/test.html) (`node:test`):** runner nativo para scripts de soporte y utilidades de tooling que no requieran arrastrar Vitest como dependencia.
@@ -58,7 +58,7 @@ Siguen pendientes la clasificación de datos, la autorización de acceso y el al
 
 - **[Husky](https://typicode.github.io/husky/):** gestiona hooks locales de Git que pueden ejecutar lint o pruebas antes de un commit o push; no sustituye CI ni garantiza seguridad.
 - **CI/CD:** práctica de automatización: integración continua (CI) ejecuta comprobaciones al integrar cambios; entrega continua prepara versiones validadas para publicación con aprobación humana, mientras despliegue continuo las publica automáticamente sólo si se elige expresamente. No se ha seleccionado proveedor ni activado despliegue automático; publicar sigue requiriendo aprobación humana y estas prácticas no habilitan datos clínicos reales.
-- **[ESLint](https://eslint.org/docs/latest/):** análisis estático para detectar patrones problemáticos según reglas configurables; su soporte y configuración para TypeScript están pendientes y no sustituye pruebas ni controles de seguridad.
+- **[ESLint](https://eslint.org/docs/latest/):** análisis estático para detectar patrones problemáticos según reglas configurables; su soporte y configuración para TypeScript están pendientes y no sustituye pruebas ni controles de seguridad. El plan de pre-commit con Husky (incluido `lint-staged`) está documentado pero no se ha completado; el `.husky/pre-commit` actual cae a `pnpm lint` cuando `lint-staged` no está configurado.
 - **[Prettier](https://prettier.io/docs/):** mantiene un formato consistente, a diferencia de las reglas de calidad de código de ESLint; no verifica comportamiento ni seguridad.
 
 ## Límite de integración
