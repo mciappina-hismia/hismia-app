@@ -7,7 +7,7 @@ beforeEach(() => {
   vi.resetModules();
   createClient.mockReset().mockReturnValue({ auth: {} });
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.test');
-  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_synthetic');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-synthetic');
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -27,15 +27,21 @@ describe('public browser Auth client', () => {
     expect(browserAuth()).toBeNull();
     expect(createClient).not.toHaveBeenCalled();
   });
-  it.each(['', 'secret_synthetic', 'service_role_synthetic', 'anon_synthetic'])(
-    'refuses non-publishable keys',
-    async (key) => {
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', key);
-      const { browserAuth } = await import('./browser');
-      expect(browserAuth()).toBeNull();
-      expect(createClient).not.toHaveBeenCalled();
-    },
-  );
+  it('refuses empty key (clears env)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
+    const { browserAuth } = await import('./browser');
+    expect(browserAuth()).toBeNull();
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it('accepts a JWT anon key (legacy Supabase format)', async () => {
+    vi.stubEnv(
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+      'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.synthetic',
+    );
+    const { browserAuth } = await import('./browser');
+    expect(browserAuth()).not.toBeNull();
+  });
   it('fails closed if the SDK initializer throws', async () => {
     createClient.mockImplementation(() => {
       throw new Error('synthetic SDK failure');
@@ -65,7 +71,7 @@ describe('public browser Auth client', () => {
     const { browserAuth } = await import('./browser');
     expect(browserAuth()).toBe(browserAuth());
     expect(createClient).toHaveBeenCalledOnce();
-    expect(createClient).toHaveBeenCalledWith('https://example.test', 'sb_publishable_synthetic', {
+    expect(createClient).toHaveBeenCalledWith('https://example.test', 'anon-key-synthetic', {
       auth: {
         flowType: 'pkce',
         detectSessionInUrl: false,

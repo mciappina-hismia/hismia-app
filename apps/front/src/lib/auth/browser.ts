@@ -6,8 +6,8 @@ let client: SupabaseClient | null = null;
 export function browserAuth(): SupabaseClient | null {
   if (typeof window === 'undefined') return null;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key || !/^sb_publishable_[A-Za-z0-9_-]+$/.test(key)) return null;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
   try {
     const endpoint = new URL(url);
     if (
