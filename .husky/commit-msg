@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Enforce Conventional Commits on every commit. Pairs with
+# `commitlint.config.cjs`, which extends @commitlint/config-conventional.
+# Exits non-zero if the commit message does not match the conventional
+# format described in AGENTS.md §3.2.
+pnpm exec commitlint --edit "$1"

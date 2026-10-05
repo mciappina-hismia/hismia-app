@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-pnpm lint-staged 2>/dev/null || pnpm lint
+# Run lint-staged on staged files. Pairs with `.lintstagedrc.cjs` at the
+# repo root, which dispatches eslint and prettier per file extension and
+# per package. Exits non-zero if any staged file fails to format or lint.
+pnpm exec lint-staged
