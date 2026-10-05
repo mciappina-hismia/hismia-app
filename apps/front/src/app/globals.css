@@ -1,0 +1,62 @@
+@import "tailwindcss" source("../");
+
+/* Canonical light tokens: doc/DESIGN/DESIGN.md. No font download. */
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #fbfefd;
+  --color-card: #ffffff;
+  --color-primary: #1e8d80;
+  --color-primary-strong: #00615a;
+  --color-primary-soft: #ddf7f0;
+  --color-primary-text: #fafffd;
+  --color-secondary: #e5f6f0;
+  --color-secondary-text: #12403c;
+  --color-accent: #caf2e7;
+  --color-accent-text: #003f3b;
+  --color-fg: #0c2422;
+  --color-muted: #5b6d6d;
+  --color-heading: #15456f;
+  --color-border: #dce7e5;
+  --color-input-border: #c6dad7;
+  --color-input: #f5fcfa;
+  --color-focus: #1e8d80;
+
+  --color-pro-primary: #15456f;
+  --color-pro-primary-strong: #023259;
+  --color-pro-primary-soft: #e4f0fd;
+  --color-pro-secondary: #ddf7f0;
+  --color-pro-secondary-text: #00544e;
+  --color-pro-border: #d3e0ec;
+  --color-pro-sidebar: #f3faff;
+
+  --color-success: #31a773;
+  --color-warning: #e8ab3e;
+  --color-danger: #cf3f4c;
+  --color-danger-soft: #ffedeb;
+  --color-pregnancy: #ea808f;
+  --color-chart-1: #1e8d80;
+  --color-chart-2: #4fad83;
+  --color-chart-3: #57b1d4;
+  --color-chart-4: #e8ab3e;
+  --color-chart-5: #9372c8;
+  --color-brand-his: #09396a;
+  --color-brand-me: #32c0b4;
+
+  --breakpoint-sm: 40rem;
+  --breakpoint-lg: 64rem;
+  --spacing-touch: 2.75rem;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}

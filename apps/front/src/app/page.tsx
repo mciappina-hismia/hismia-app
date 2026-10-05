@@ -3,7 +3,7 @@ export default function Home(): React.ReactElement {
     <main>
       <h1>Hismia MVP bootstrap</h1>
       <p>Monorepo ready for Unit 2 (auth).</p>
-      <a href="/signup">Create account</a> · <a href="/login">Sign in</a>
+      <a href="/signup">Crear Cuenta</a> · <a href="/login">Iniciar Sesión</a>
     </main>
   );
 }

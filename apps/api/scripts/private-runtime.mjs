@@ -337,8 +337,14 @@ async function configureCa(d, config, ca) {
     }
   }
 }
+// These exact package-runner keys describe the invocation, not runtime overrides.
+// Their values are never interpreted or forwarded (see the child env allowlist).
+const LIFECYCLE_METADATA = new Set(['npm_config_user_agent', 'npm_config_recursive']);
 function environmentSafe(env) {
   for (const key of Object.keys(env)) {
+    if (LIFECYCLE_METADATA.has(key)) continue;
+    // The start child already forces development; no other Node setting is benign.
+    if (key === 'NODE_ENV' && env[key] === 'development') continue;
     if (
       /^(DATABASE_|DIRECT_URL$|PG|PRISMA_|NODE_|LD_|DYLD_|npm_config_|NPM_CONFIG_|DEBUG$|RUST_|SSL_CERT_)/.test(
         key,
