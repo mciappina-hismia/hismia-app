@@ -22,6 +22,11 @@ const AUTH_KEYS = [
 const fail = () => {
   throw new Error('private runtime rejected');
 };
+// Categorized IO error: never includes the failing path or its content.
+// Only a fixed allowlist of phases is exposed via error.code; the message is generic.
+function ioFailure(phase) {
+  throw Object.assign(new Error('private runtime rejected'), { code: phase });
+}
 
 export function scram(password, salt, iterations = 4096) {
   if (
@@ -205,7 +210,14 @@ async function secureWrite(d, p, content, created) {
 }
 async function readConfig(d, p) {
   await parents(d);
-  const before = await d.io.lstat(p);
+  let before;
+  try {
+    before = await d.io.lstat(p);
+  } catch (error) {
+    if (error?.code === 'ENOENT') ioFailure('IO_CONFIG_MISSING');
+    if (error?.code === 'EACCES' || error?.code === 'EPERM') ioFailure('IO_CONFIG_DENIED');
+    throw error;
+  }
   privateStat(before, d.uid);
   const h = await d.io.open(p, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
@@ -224,7 +236,14 @@ async function readConfig(d, p) {
 }
 async function validateCa(d, path) {
   canonicalCaPath(path);
-  const before = await d.io.lstat(path);
+  let before;
+  try {
+    before = await d.io.lstat(path);
+  } catch (error) {
+    if (error?.code === 'ENOENT') ioFailure('IO_CA_MISSING');
+    if (error?.code === 'EACCES' || error?.code === 'EPERM') ioFailure('IO_CA_DENIED');
+    throw error;
+  }
   if (
     before.isSymbolicLink() ||
     !before.isFile() ||
@@ -454,7 +473,13 @@ export async function run(args, d) {
     for (const key of AUTH_KEYS) if (d.env[key]) env[key] = d.env[key];
     const apiRoot = join(d.root, 'apps/api');
     const nest = join(apiRoot, 'node_modules/.bin/nest');
-    await d.io.access(nest, constants.X_OK);
+    try {
+      await d.io.access(nest, constants.X_OK);
+    } catch (error) {
+      if (error?.code === 'ENOENT') ioFailure('IO_NEST_MISSING');
+      if (error?.code === 'EACCES' || error?.code === 'EPERM') ioFailure('IO_NEST_DENIED');
+      throw error;
+    }
     const code = await d.spawn(nest, ['start'], {
       cwd: apiRoot,
       env,
@@ -462,8 +487,12 @@ export async function run(args, d) {
       stdio: 'ignore',
     });
     return result(code === 0, 'API_EXIT');
-  } catch {
-    return result(false, created.value ? 'PREPARE_PARTIAL' : category);
+  } catch (error) {
+    if (created.value) return result(false, 'PREPARE_PARTIAL');
+    // Map fixed allowlisted IO phases without ever exposing paths, contents or Node messages.
+    const code = error?.code;
+    if (typeof code === 'string' && code.startsWith('IO_')) return result(false, code);
+    return result(false, category);
   }
 }
 
