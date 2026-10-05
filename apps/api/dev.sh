@@ -1,11 +1,14 @@
 #!/bin/bash
-# The AppConfigModule in apps/api/src/app-config/app-config.module.ts
-# replaces the old private-runtime.mjs start path. The start
-# strict-env-allowlist was dropped: Nest now starts with the operator's
-# full process.env, and the AppConfigModule's OnModuleInit asserts the
-# DATABASE_URL, CA and DB connectivity via dedicated, well-tested pure
-# functions. Setup of the private config and CA still uses
-# `apps/api/scripts/dev-setup.mjs` and must be run once before this
-# script is useful.
 set -euo pipefail
+# Load non-secret defaults from apps/api/.env (URLs, anon key, NODE_ENV).
+# This is a sibling of the private `apps/api/.env.runtime.local`; both
+# live alongside `apps/api/dev.sh` and are required for `pnpm dev` to
+# reach the listener. Anything already exported in the shell wins.
+SCRIPT_DIR="$(cd "$(dirname -- "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$SCRIPT_DIR/.env"
+  set +a
+fi
 exec pnpm exec nest start "$@"
