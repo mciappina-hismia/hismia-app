@@ -40,6 +40,7 @@ export async function confirmedUser(auth: SupabaseClient): Promise<boolean> {
 }
 
 export const CONFIRM_PATH = '/auth/confirm';
+export const RECOVERY_PATH = '/auth/reset-password';
 export const ONBOARDING_PATH = '/onboarding';
 
 export function cleanCallbackUrl(): string | null {
