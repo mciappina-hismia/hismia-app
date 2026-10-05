@@ -93,23 +93,43 @@ export default function Onboarding(): React.ReactElement {
     }
   };
   return (
-    <main>
-      <h1>Onboarding</h1>
-      {state === 'checking' && <p role="status">Checking your account…</p>}
-      {state === 'setup' && <p role="status">Setup required. Contact the site administrator.</p>}
-      {state === 'login' && (
-        <p role="status">
-          Confirm your email and <a href="/login">sign in</a> to continue.
-        </p>
-      )}
-      {state === 'unavailable' && (
-        <p role="status">Account verification unavailable. Please try again later.</p>
-      )}
-      {state === 'ready' && (
-        <>
-          <p>
-            Choose your account type and complete your profile. A signup preference is not a role.
+    <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8 sm:px-8 sm:py-12">
+      <div className="grid w-full max-w-2xl gap-6 rounded-3xl border border-border bg-card p-8 shadow-xl shadow-primary-soft/40 sm:p-12">
+        <header className="space-y-3">
+          <h1 className="text-4xl leading-tight font-semibold tracking-tight text-heading">
+            Onboarding
+          </h1>
+          {state === 'ready' && (
+            <p className="text-base leading-relaxed text-muted">
+              Choose your account type and complete your profile. A signup preference is not a role.
+            </p>
+          )}
+        </header>
+        {state === 'checking' && (
+          <p role="status" className="text-base leading-relaxed text-muted">
+            Checking your account…
           </p>
+        )}
+        {state === 'setup' && (
+          <p role="status" className="text-base leading-relaxed text-muted">
+            Setup required. Contact the site administrator.
+          </p>
+        )}
+        {state === 'login' && (
+          <p role="status" className="text-base leading-relaxed text-muted">
+            Confirm your email and{' '}
+            <a href="/login" className="text-primary-strong underline">
+              sign in
+            </a>{' '}
+            to continue.
+          </p>
+        )}
+        {state === 'unavailable' && (
+          <p role="status" className="text-base leading-relaxed text-muted">
+            Account verification unavailable. Please try again later.
+          </p>
+        )}
+        {state === 'ready' && (
           <OnboardingForm
             key={subject}
             authorize={authorize}
@@ -122,8 +142,8 @@ export default function Onboarding(): React.ReactElement {
               setState('login');
             }}
           />
-        </>
-      )}
+        )}
+      </div>
     </main>
   );
 }
