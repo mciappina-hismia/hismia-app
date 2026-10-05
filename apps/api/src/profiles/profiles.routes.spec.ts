@@ -18,6 +18,12 @@ describe('onboarding routes', () => {
   const createOrRead = vi.fn();
   const authenticate = vi.fn();
   beforeEach(async () => {
+    process.env.APP_CONFIG_SKIP_INIT = '1';
+    process.env.SUPABASE_PROJECT_URL = 'https://example.test';
+    process.env.SUPABASE_JWKS_URL = 'https://example.test/.well-known/jwks.json';
+    process.env.SUPABASE_ISSUER = 'https://example.test/auth/v1';
+    process.env.SUPABASE_AUDIENCE = 'authenticated';
+    process.env.SUPABASE_ANON_KEY = 'anon';
     createOrRead.mockReset().mockResolvedValue(persisted);
     authenticate.mockReset().mockResolvedValue({
       sub: 'confirmed-subject',

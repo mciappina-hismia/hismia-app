@@ -17,6 +17,12 @@ describe('auth routes', () => {
   let getUser: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
+    process.env.APP_CONFIG_SKIP_INIT = '1';
+    process.env.SUPABASE_PROJECT_URL = 'https://example.test';
+    process.env.SUPABASE_JWKS_URL = `${issuer}/.well-known/jwks.json`;
+    process.env.SUPABASE_ISSUER = issuer;
+    process.env.SUPABASE_AUDIENCE = 'authenticated';
+    process.env.SUPABASE_ANON_KEY = 'anon';
     const keys = await generateKeyPair('ES256');
     confirmed = true;
     getUser = vi.fn().mockImplementation(async () => ({

@@ -54,7 +54,7 @@ part of this source change. No account/profile data is seeded or inserted.
 1. Generate the real restricted credential locally (human only):
 
    ```sh
-   env -i PATH="$PATH" HOME="$HOME" node apps/api/scripts/private-runtime.mjs prepare
+   env -i PATH="$PATH" HOME="$HOME" node apps/api/scripts/dev-setup.mjs prepare
    ```
 
    Requires TTY stdin/stdout and trusted, owned, non-group/world-writable canonical
@@ -63,9 +63,9 @@ part of this source change. No account/profile data is seeded or inserted.
    `apps/api/.env.runtime.provision.sql` (SCRAM verifier-based SQL). Both are already
    Git-ignored. Never print, commit, paste into chat or expose either file: **the
    verifier is also a credential**. No existing file is overwritten, no symlink is
-   followed, and nothing is chmodded or deleted. `FAIL PREPARE_PARTIAL` means at
-   least one target may exist, including incomplete content; stop and inspect
-   privately. There is no automatic cleanup or retry/rotation workflow.
+   followed, and nothing is chmodded or deleted. `FAIL CONFIG` after a partial
+   success means at least one target may exist, including incomplete content; stop
+   and inspect privately. There is no automatic cleanup or retry/rotation workflow.
 
 2. Open the private provisioning SQL locally in a private editor (including its
    clipboard/history/backups), and execute it only in the authorized **hismia-dev /
@@ -82,7 +82,7 @@ part of this source change. No account/profile data is seeded or inserted.
    verification, run exactly once from a private terminal with a clean environment:
 
    ```sh
-   env -i PATH="$PATH" HOME="$HOME" node apps/api/scripts/private-runtime.mjs configure-ca --ack-ca-config /Users/mauroociappina/Downloads/prod-ca-2021.crt
+   env -i PATH="$PATH" HOME="$HOME" node apps/api/scripts/dev-setup.mjs configure-ca --ack-ca-config /Users/mauroociappina/Downloads/prod-ca-2021.crt
    ```
 
    This is an explicitly acknowledged local config update, **not** a password
@@ -104,52 +104,44 @@ part of this source change. No account/profile data is seeded or inserted.
    strict-CA configuration; removing `sslcert` is not an approved TLS fallback.
    Portable same-UID filesystem races cannot be fully eliminated.
 
-4. Only after configuration, independent verification and the separately
-   authorized **single** remote-read-only check (no automatic retry):
+4. The start-time DB check moved to the API bootstrap. The new
+   `AppConfigModule` in `apps/api/src/app-config/app-config.module.ts` runs
+   the same read-only probe as an `OnModuleInit` hook when `pnpm dev`
+   (or `bash apps/api/dev.sh`) starts the API. The probe reads only the
+   exact private runtime config, validates ownership, regular file,
+   single link, mode and canonical URL before network, and uses installed
+   Prisma 6.19.0 with `log: []`. The bounded read-only transaction checks
+   database/user, role attributes/membership/ownership, private effective
+   grants, FORCE/ENABLE RLS, absent/empty subject and a bounded EXISTS
+   visibility query (no rows printed). It always attempts disconnect.
+   Failures throw with a fixed stage label: `FAIL DB_PROBE CLIENT`,
+   `TRANSACTION_P1000`, `_P1001`, `_P1002`, `_P1003`, `_P1011`, `_P1017`,
+   `_P2024`, `_P2028`, `TRANSACTION_UNKNOWN`, `READ_ONLY`, `CATALOG`,
+   `VISIBILITY`, or `DISCONNECT`. These labels are diagnostic stages, not
+   raw errors or proof of a specific root cause. A successful probe
+   means the API is allowed to bind; it does not prove HTTP flow,
+   onboarding, remote race, or deployment readiness.
+
+5. Start the API after the operator privately supplies the existing real
+   Supabase auth environment (`SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`,
+   `SUPABASE_JWKS_URL`, `SUPABASE_ISSUER`, `SUPABASE_AUDIENCE`) in
+   `apps/api/.env`, without printing it or changing auth credentials:
 
    ```sh
-   env -i PATH="$PATH" HOME="$HOME" node apps/api/scripts/private-runtime.mjs check --ack-remote-read-only
+   pnpm --filter @hismia/api dev
    ```
 
-   This reads only the exact private runtime config, validates ownership, regular
-   file, single link, mode and canonical URL before network, and uses installed
-   Prisma 6.19.0 with `log: []`. It refuses generated Prisma dotenv paths before
-   importing the client. The bounded read-only transaction checks database/user,
-   role attributes/membership/ownership, private effective grants, FORCE/ENABLE
-   RLS, absent/empty subject and a bounded EXISTS visibility query (no rows printed).
-   It always attempts disconnect. Failures emit only fixed stage labels:
-   `FAIL CLIENT` (construction/import), `FAIL TRANSACTION_P1000`,
-   `_P1001`, `_P1002`, `_P1003`, `_P1011`, `_P1017`, `_P2024`, or `_P2028`
-   (fixed allowlisted Prisma code for a pre-callback transaction rejection),
-   `FAIL TRANSACTION_UNKNOWN` (any other pre-callback rejection),
-   `FAIL READ_ONLY` (transaction
-   setup), `FAIL CATALOG`, `FAIL VISIBILITY`, or `FAIL DISCONNECT` (overrides
-   any earlier failure). These labels are diagnostic stages, not raw errors or
-   proof of a specific root cause. `PASS CHECK` occurs only after all assertions
-   and disconnect succeed; it is restricted Prisma connectivity/catalog/no-context
-   proof, **not full HTTP
-   flow, onboarding, remote race proof or deployment readiness**.
-
-5. Optionally start **only the API**, after the operator privately supplies the
-   existing real Supabase auth environment (`SUPABASE_PROJECT_URL`,
-   `SUPABASE_ANON_KEY`, `SUPABASE_JWKS_URL`, `SUPABASE_ISSUER`,
-   `SUPABASE_AUDIENCE`), without printing it or changing auth credentials:
-
-   ```sh
-   node apps/api/scripts/private-runtime.mjs start --ack-api-listener
-   ```
-
-   This passes the private URL only in the allowlisted child environment to fixed
-   the installed API-only `node_modules/.bin/nest start` from `apps/api`, never the
-   package `dev` script, root recursive dev or frontend. `apps/api/dev.sh` delegates
-   to the same helper without sourcing `.env` or `.env.runtime.local`; arguments
-   other than the fixed acknowledgment are rejected before reading private files.
-   No URL is
-   in argv; no migration is run. Child stdin/stdout/stderr are suppressed because
-   arbitrary framework errors may contain credentials. The helper waits for exit
-   and reports only `PASS API_EXIT` or failure, never readiness from spawn.
-   The unchanged API listener binds **0.0.0.0**, not loopback: use a trusted network
-   and appropriate host firewall. Stop through the private terminal and verify
+   `apps/api/dev.sh` invokes `pnpm exec nest start` from `apps/api`.
+   Unlike the previous helper-driven flow, the API now starts with the
+   operator's full `process.env`. The previous strict allowlist (which
+   rejected benign `NODE_*` variables like `NODE_OPTIONS=--no-deprecation`)
+   was dropped as part of the simplification. Validation of the private
+   `DATABASE_URL`, the pinned CA, and the read-only DB probe is now
+   performed by the `AppConfigModule` at Nest bootstrap; any failure
+   throws and the process exits with code 1. No URL is in argv; no
+   migration is run. The API listener binds **0.0.0.0**, not loopback: use
+   a trusted network and appropriate host firewall. Stop through the
+   private terminal and verify
    process shutdown separately. This helper is not a daemon/process supervisor.
 
 The fixed Session pooler endpoint is
