@@ -79,7 +79,34 @@ feat(icon): add HisMia logo image file
 
 ### 3.3 Hooks locales
 
-- **Husky** puede correr lint/format antes de commit o push. No reemplaza CI ni garantiza seguridad.
+Los hooks viven en `.husky/` y se activan automáticamente al ejecutar
+`pnpm install`, porque el script `prepare` del root package.json corre
+`husky`, que setea `core.hooksPath` a `.husky/_/`. No reemplazan CI
+ni garantizan seguridad: son la puerta local más cercana al commit y
+un complemento, no un sustituto, de la revisión humana.
+
+- **`pre-commit`**: corre `pnpm exec lint-staged`, cuya configuración
+  path-aware vive en `.lintstagedrc.cjs`. Formatea los archivos staged
+  con Prettier y aplica `eslint --fix --max-warnings=0` por paquete
+  (`apps/front` usa su propio ESLint 9 via
+  `pnpm --filter @hismia/front exec eslint`; `apps/api` y `packages/*`
+  usan el flat config del root via `pnpm exec eslint`). Los
+  `*.{js,mjs,cjs}` y `*.{json,md}` pasan solo por Prettier porque el
+  ESLint del root es TypeScript-only e ignora esas extensiones.
+- **`commit-msg`**: corre `pnpm exec commitlint --edit "$1"`, con la
+  config en `commitlint.config.cjs` que extiende
+  `@commitlint/config-conventional`. Enforce el formato
+  Conventional Commits detallado en §3.2.
+- **`pre-push`**: corre `pnpm -r run lint`, que ejecuta ESLint en los
+  cuatro paquetes del monorepo (`apps/api`, `apps/front`,
+  `packages/types`, `packages/validation`). Toma ~4s en este repo.
+
+Para saltarse un hook puntualmente: `git commit --no-verify` o
+`git push --no-verify`. **No** commitear esos bypasses al repo: si un
+hook molesta, se arregla en su configuración, no se desactiva por
+defecto. Si los hooks parecen no correr en un clone nuevo, verificar
+que `git config core.hooksPath` devuelva `.husky/_/`.
+
 - Respetar **ESLint** y **Prettier** (configuración pendiente de alinear con TypeScript).
 
 ### 3.4 Pull Requests
@@ -190,14 +217,14 @@ La **política objetivo de `tsconfig.json`** (flags estrictos, buenas prácticas
 
 **Estructura por endpoint / bounded context:** cada endpoint vive en una carpeta bajo `apps/api/src/<bounded-context>/`. Cuando un endpoint expone lógica de negocio, esa carpeta contiene este set mínimo de archivos (los nombres pueden sumar prefijos o sufijos según el contexto, p. ej. `patients.signup.controller.ts` si hace falta):
 
-| Archivo | Responsabilidad |
-|---|---|
-| `<endpoint>.types.ts` | Tipos TypeScript del contrato del endpoint (request, response, errores). |
-| `<endpoint>.service.ts` o `<bounded-context>.service.ts` | Lógica de negocio. Aggregate checks, orquestación de repositorios, reglas de autorización. |
-| `<endpoint>.controller.ts` | Solo rutea HTTP al service. No calcula nada. |
-| `<endpoint>.controller.test.ts` | Tests unitarios del controller (mockean el service; verifican routing y delegación). |
+| Archivo                                                            | Responsabilidad                                                                              |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `<endpoint>.types.ts`                                              | Tipos TypeScript del contrato del endpoint (request, response, errores).                     |
+| `<endpoint>.service.ts` o `<bounded-context>.service.ts`           | Lógica de negocio. Aggregate checks, orquestación de repositorios, reglas de autorización.   |
+| `<endpoint>.controller.ts`                                         | Solo rutea HTTP al service. No calcula nada.                                                 |
+| `<endpoint>.controller.test.ts`                                    | Tests unitarios del controller (mockean el service; verifican routing y delegación).         |
 | `<endpoint>.service.test.ts` o `<bounded-context>.service.test.ts` | Tests del service con cada dependencia inyectada (DB, Auth, Storage, Sentry, etc.) mockeada. |
-| `<endpoint>.routes.test.ts` | Tests e2e de las rutas reales con supertest contra la app Fastify. |
+| `<endpoint>.routes.test.ts`                                        | Tests e2e de las rutas reales con supertest contra la app Fastify.                           |
 
 Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service.ts` igual existe: la separación service/controller es la regla, no la excepción. Si el endpoint no tiene service, se está saltando la convención.
 
@@ -248,6 +275,7 @@ Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service
 - Cuando el runner todavía no está configurado en el módulo tocado: explicar la excepción en la tarea ODD y diferir el test a una unidad de trabajo inmediata.
 
 **Rúbrica mínima de unidad cerrada.** Toda unidad de trabajo (commit) cierra con, como mínimo:
+
 - **Ruta de código tocada** (path:line) y **ruta de test** que cubre el comportamiento nuevo o modificado.
 - **Evidencia RED → GREEN → REFACTOR** observada (comando exacto y resultado), o justificación explícita de la excepción.
 - **Evidencia integrada** cuando se trate de autorización, persistencia, JWT o contratos públicos: un test contra la app real (supertest o equivalente) y, si aplica, contra la base restringida con la política esperada.
