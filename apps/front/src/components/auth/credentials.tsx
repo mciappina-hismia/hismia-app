@@ -81,11 +81,11 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
 
   return (
     <main>
-      <h1>{mode === 'signup' ? 'Create account' : 'Sign in'}</h1>
+      <h1>{mode === 'signup' ? 'Crear Cuenta' : 'Iniciar Sesión'}</h1>
       <form onSubmit={submit} noValidate>
         <label htmlFor="email">Email</label>
         <input id="email" name="email" type="email" autoComplete="email" required disabled={busy} />
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">Contraseña</label>
         <input
           id="password"
           name="password"
@@ -99,9 +99,9 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
         />
         {mode === 'signup' && (
           <>
-            <label htmlFor="accountType">Account type (onboarding preference only)</label>
+            <label htmlFor="accountType">Tipo de cuenta (solo para preferencia de onboarding)</label>
             <select id="accountType" name="accountType" defaultValue="" required disabled={busy}>
-              <option value="">Choose account type</option>
+              <option value="">Elegir tipo de cuenta</option>
               {ACCOUNT_TYPES.map((type) => (
                 <option key={type} value={type}>
                   {type}
@@ -111,14 +111,14 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
           </>
         )}
         <button type="submit" disabled={busy}>
-          {busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}
+          {busy ? 'Por favor, espere…' : mode === 'signup' ? 'Crear Cuenta' : 'Iniciar Sesión'}
         </button>
       </form>
       <p role="status" aria-live="polite">
         {message}
       </p>
       <a href={mode === 'signup' ? '/login' : '/signup'}>
-        {mode === 'signup' ? 'Sign in' : 'Create account'}
+        {mode === 'signup' ? 'Iniciar Sesión' : 'Crear Cuenta'}
       </a>
     </main>
   );

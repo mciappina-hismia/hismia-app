@@ -13,7 +13,7 @@ describe('Home page', () => {
 
   it('offers direct signup and returning login', () => {
     render(<Home />);
-    expect(screen.getByRole('link', { name: /create account/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /crear cuenta/i })).toHaveAttribute(
       'href',
       '/signup',
     );

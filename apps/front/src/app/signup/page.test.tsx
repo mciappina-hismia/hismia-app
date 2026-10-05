@@ -26,7 +26,7 @@ function submit(type: string): void {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.test' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
   fireEvent.change(screen.getByLabelText(/Account type/), { target: { value: type } });
-  fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Crear Cuenta' }));
 }
 
 describe('direct signup', () => {
