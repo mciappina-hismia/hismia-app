@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Gate pushes on a clean lint across every workspace package. Runs the
+# same `pnpm -r run lint` invoked by the root `pnpm lint` script. Exits
+# non-zero if any package fails lint, aborting the push.
+pnpm -r run lint
