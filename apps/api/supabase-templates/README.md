@@ -29,10 +29,9 @@ regardless of the receiver's UI theme.
 ## Files
 
 - `confirmation.html` — signup confirmation email.
-- `password_recovery.html` — TBD (use the same shell; replace the
-  h1, body copy, and `{{ .ConfirmationURL }}` → `{{ .ConfirmationURL }}`
-  variable name — Supabase reuses the same URL field for password
-  recovery).
+- `recovery.html` — password recovery email (lands in the repo; applying
+  it to the dashboard requires issue #14 — custom SMTP not yet
+  configured).
 - `email_change.html` — TBD.
 - `magic_link.html` — TBD.
 
