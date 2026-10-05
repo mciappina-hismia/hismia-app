@@ -1,33 +1,97 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { browserAuth, confirmedUser } from '../../lib/auth/browser';
+import { useEffect, useRef, useState } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { browserAuth } from '../../lib/auth/browser';
 import { readPreference, type AccountType } from '../../lib/auth/preference';
+import { verifyAccount } from '../../lib/profiles/client';
+import { OnboardingForm, type SubmitAccess } from '../../components/profiles/onboarding-form';
+
+async function checkedAccount(
+  auth: SupabaseClient,
+): Promise<{ kind: 'ready'; subject: string; token: string } | { kind: 'signin' | 'unavailable' }> {
+  const { data: userData, error: userError } = await auth.auth.getUser();
+  const user = userData.user;
+  if (userError || !user?.id || !user.email_confirmed_at) return { kind: 'signin' };
+  const { data: sessionData, error: sessionError } = await auth.auth.getSession();
+  const session = sessionData.session;
+  if (sessionError || !session?.access_token || session.user?.id !== user.id)
+    return { kind: 'signin' };
+  const gate = await verifyAccount(session.access_token);
+  if (gate.kind !== 'ready') return gate;
+  if (gate.subject !== user.id) return { kind: 'signin' };
+  return { kind: 'ready', subject: user.id, token: session.access_token };
+}
 
 export default function Onboarding(): React.ReactElement {
-  const [state, setState] = useState<'checking' | 'confirmed' | 'login' | 'setup'>('checking');
+  const [state, setState] = useState<'checking' | 'ready' | 'login' | 'setup' | 'unavailable'>(
+    'checking',
+  );
   const [preference, setPreference] = useState<AccountType | null>(null);
+  const [subject, setSubject] = useState('');
+  const identity = useRef('');
+  const generation = useRef(0);
+  const authRef = useRef<SupabaseClient | null>(null);
   useEffect(() => {
+    let active = true;
     const auth = browserAuth();
     if (!auth) {
       setState('setup');
       return;
     }
-    let active = true;
-    void confirmedUser(auth)
-      .then((valid) => {
-        if (active) {
-          if (valid) setPreference(readPreference());
-          setState(valid ? 'confirmed' : 'login');
-        }
+    authRef.current = auth;
+    // This callback is synchronous; never await Supabase SDK methods inside it.
+    const {
+      data: { subscription },
+    } = auth.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') return;
+      // Before the first gate settles, a material auth event invalidates its in-flight result.
+      // Once settled, a same-account refresh keeps the draft; a switch or signout does not.
+      if (identity.current && event !== 'SIGNED_OUT' && session?.user?.id === identity.current)
+        return;
+      generation.current++;
+      identity.current = '';
+      setSubject('');
+      setState('login');
+    });
+    const initial = generation.current;
+    void checkedAccount(auth)
+      .then((result) => {
+        if (!active || initial !== generation.current) return;
+        if (result.kind === 'ready') {
+          identity.current = result.subject;
+          setSubject(result.subject);
+          setPreference(readPreference());
+          setState('ready');
+        } else setState(result.kind === 'signin' ? 'login' : 'unavailable');
       })
       .catch(() => {
-        if (active) setState('login');
+        if (active && initial === generation.current) setState('unavailable');
       });
     return () => {
       active = false;
+      generation.current++;
+      subscription.unsubscribe();
+      authRef.current = null;
     };
   }, []);
+
+  const authorize: SubmitAccess = async () => {
+    const auth = authRef.current;
+    const expected = identity.current;
+    const version = generation.current;
+    if (!auth || !expected) return { kind: 'signin' };
+    try {
+      const result = await checkedAccount(auth);
+      if (version !== generation.current || identity.current !== expected)
+        return { kind: 'signin' };
+      if (result.kind !== 'ready') return result;
+      if (result.subject !== expected) return { kind: 'signin' };
+      return { kind: 'ready', token: result.token };
+    } catch {
+      return { kind: 'unavailable' };
+    }
+  };
   return (
     <main>
       <h1>Onboarding</h1>
@@ -38,11 +102,27 @@ export default function Onboarding(): React.ReactElement {
           Confirm your email and <a href="/login">sign in</a> to continue.
         </p>
       )}
-      {state === 'confirmed' && (
-        <p role="status">
-          Email confirmed. {preference && `${preference} preference (not a role). `}Profile forms
-          and saving your profile are not available yet.
-        </p>
+      {state === 'unavailable' && (
+        <p role="status">Account verification unavailable. Please try again later.</p>
+      )}
+      {state === 'ready' && (
+        <>
+          <p>
+            Choose your account type and complete your profile. A signup preference is not a role.
+          </p>
+          <OnboardingForm
+            key={subject}
+            authorize={authorize}
+            isCurrent={() => identity.current === subject}
+            initialType={preference}
+            onSignin={() => {
+              generation.current++;
+              identity.current = '';
+              setSubject('');
+              setState('login');
+            }}
+          />
+        </>
       )}
     </main>
   );
