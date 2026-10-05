@@ -53,7 +53,13 @@ export function parseConfig(text: unknown): string {
   if (typeof text !== 'string' || text.length > 1024) fail();
   const match = /^DATABASE_URL=(postgresql:\/\/[^\r\n]+)\n$/.exec(text);
   if (!match) fail();
-  const url = new URL(match[1]);
+  // `noUncheckedIndexedAccess` widens `match[1]` to `string | undefined`; the
+  // truthy-narrow on `match` does not propagate to indexed access. Assign
+  // through a local to narrow before passing to `new URL(...)` and to
+  // round-trip checks below.
+  const urlText = match[1];
+  if (urlText === undefined) fail();
+  const url = new URL(urlText);
   // The password is typed as a string in the URL interface but TS sees the
   // overloaded `string` (with the `String.prototype.toString` member) in
   // this project's lib config; coerce explicitly to satisfy the call.
@@ -62,6 +68,6 @@ export function parseConfig(text: unknown): string {
   const caRaw = url.searchParams.get('sslcert');
   const ca: string | undefined = caRaw === null ? undefined : caRaw;
   const expected = runtimeUrl(password, ca);
-  if (match[1] !== expected || text !== `DATABASE_URL=${match[1]}\n`) fail();
-  return match[1];
+  if (urlText !== expected || text !== `DATABASE_URL=${urlText}\n`) fail();
+  return urlText;
 }

@@ -18,7 +18,22 @@ import { parseConfig } from './parse-config.js';
 import { validateCaContents } from './validate-ca.js';
 import { probeDb, type DbClient, type DbProbeStage } from './db-probe.js';
 
-export const APP_CONFIG_FILE = 'apps/api/.env.runtime.local';
+// Resolve the runtime config file's absolute path from this module's
+// directory. The module compiles to `apps/api/dist/app-config/` (CJS)
+// or runs in-place under ts-node (`apps/api/src/app-config/`); both
+// resolve to `apps/api/.env.runtime.local` via `../../.env.runtime.local`.
+// `__dirname` is the CJS convention. The `APP_CONFIG_FILE` env var
+// overrides for unusual layouts (forks, worktrees, custom deploys).
+declare const __dirname: string;
+
+// Compute the absolute path to `apps/api/.env.runtime.local` from this
+// module's location. The module compiles to `apps/api/dist/app-config/`
+// under CJS or runs in-place under ts-node (`apps/api/src/app-config/`);
+// both resolve to `apps/api/.env.runtime.local` via `../../.env.runtime.local`.
+// The `APP_CONFIG_FILE` env var overrides for unusual layouts (forks,
+// worktrees, custom deploys).
+export const APP_CONFIG_FILE =
+  process.env.APP_CONFIG_FILE ?? resolve(__dirname, '../../.env.runtime.local');
 export const APP_CONFIG_MAX_BYTES = 1024;
 export const APP_CA_MAX_BYTES = 8192;
 export const APP_CA_MIN_BYTES = 500;
