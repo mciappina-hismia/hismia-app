@@ -40,3 +40,38 @@ SRP significa que cada responsabilidad tiene una razón coherente para cambiar, 
 5. **Guard:** puede comprobar identidad y restricciones generales en el límite de entrada; por sí solo no basta para autorizar un recurso específico, un grant aún vigente o la autoría de una nota. La validación efectiva debe cubrir también descargas y cargas, incluidas las comprobaciones al iniciar y finalizar una carga.
 
 El dashboard global descrito en README sólo permite consulta limitada de cuentas y asignación manual de Pioneer según su alcance respectivo. La antigua mención de edición o suspensión administrativa no está confirmada allí: queda pendiente, no autorizada por este documento. Ninguna de estas responsabilidades crea acceso administrativo a historias clínicas.
+
+## Threat model: STRIDE + LINDDUN por flujo
+
+El modelo de amenazas se aplica a **cada flujo que toca datos clínicos** y se revisa al expandir la unidad. No es un checklist genérico: cada amenaza tiene un control verificable y un test (negativo o de integración) asociado.
+
+### Flujo cubierto en este documento
+
+User agent → frontend (Next.js) → backend (NestJS/Fastify) → Supabase Auth (JWKS) y base restringida (schema `profile_private`). Aplica a la ruta de onboarding actual y a toda ruta futura que opere grants, notas o PDF clínicos.
+
+### STRIDE (seguridad)
+
+| Categoría | Amenaza concreta | Control verificable |
+|---|---|---|
+| **Spoofing** | Token JWT forjado o de un emisor distinto a Supabase; bearer token robado reutilizado como otro sujeto. | Verificación de firma contra JWKS público de Supabase con `jose`; comparación de `iss`, `aud=authenticated` y `sub`; rotación de JWKS por TTL corto. |
+| **Tampering** | Alteración de `scope`, `authorization_details` (futuro), o `subject_id` en el body para acceder a otro recurso. | El backend deriva el sujeto persistido desde la identidad verificada del JWT, nunca desde el body; validación Zod de forma con allowlist; RLS por `subject_id`. |
+| **Repudiation** | El profesional niega haber leído o escrito una nota clínica. | Auditoría con `request_id`, `subject_id` (hasheado), `resource_id`, `action`, timestamp; retención definida por política; sin PII clínica en logs. |
+| **Information disclosure** | Filtración de tokens por URL, history del navegador, logs o telemetría; fingerprint del endpoint de health que revela versión. | `Authorization` header sólo (sin query string); redactores en logs; `/health` sin fingerprint de versión ni stack; mensajes de error genéricos al exterior. |
+| **Denial of service** | Abuso del endpoint de onboarding, JWT introspection costosa, fuerza bruta en `/login`/`/signup`. | Rate-limit por endpoint sensible (no sólo global), paginación capada, timeouts en JWKS y Prisma, circuit breaker sobre Supabase Auth. |
+| **Elevation of privilege** | BOLA: sujeto A opera sobre recursos del sujeto B. BFLA: cuenta confirmada con email intenta rutas admin o profesionales. | `policy evaluation` por objeto, acción y propiedad en cada request; tests negativos cross-subject; tabla de claims mínimas; ningún claim eleva privilegios sin re-evaluación backend. |
+
+### LINDDUN (privacidad)
+
+| Categoría | Riesgo concreto | Control verificable |
+|---|---|---|
+| **Linking** | `sub` estable correlaciona actividad entre APIs y tenants. | Sub pairwise/pseudónimo por audiencia cuando aplique; audiences explícitas por API/tenant. |
+| **Identifying** | Claims del token exponen identidad o tenant. | Minimización de claims; uso de reference tokens o JWT cifrado cuando los datos son sensibles. |
+| **Non-repudiation** | Logs inmutables se vuelven evidencia de comportamiento sensible. | Hasheo/tokenización de identificadores; retención por clase de dato; acceso mínimo al log store. |
+| **Detecting** | Mensajes de error distintos permiten enumerar pacientes o grants. | Errores externos genéricos con `documentation: X.Y`; mensajes internos con clase real para el bounded context. |
+| **Disclosure** | Tokens, consentimientos y detalles de grant exponen datos sensibles. | Consentimientos con campos mínimos; redacción en logs; TLS estricto (ver `doc/TECNOLOGIAS.md`); acceso mínimo. |
+| **Unawareness** | El usuario no entiende duración, alcance o revocación del grant. | Pantalla de consentimiento con recurso, acción, duración y receptor visibles; panel de revocación inmediata. |
+| **Non-compliance** | Recolección y retención exceden el consentimiento. | Mapeo por scope/campo de propósito, retención y dueño de política; auditoría anual. |
+
+### Pruebas negativas mínimas por flujo clínico
+
+Toda ruta que opere grants, notas o PDF clínicos debe sumar tests negativos a su rúbrica TDD: token alterado, `aud` distinto, `sub` cruzado, grant revocado usado, scope expansion, rate-limit excedido, error 500 que filtra stack. La ausencia de estos tests bloquea el cierre de la unidad.
