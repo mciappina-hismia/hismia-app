@@ -87,9 +87,9 @@ Seleccionables desde el menú de accesibilidad. Cada palette define un **tono fu
 
 ## Paleta dark (V1, sin toggle UI)
 
-> **Estado V1**: dark mode **SÍ está implementado en V1** (decisión CTO 2026-09-18). Aplicación: bloque `.dark` en [`apps/web/src/app/globals.css`](../../apps/web/src/app/globals.css) que override los 24 tokens semánticos de `@theme {}`. Integración runtime: [`ThemeProvider`](../../apps/web/src/components/theme-provider.tsx) wrappea `<QueryProvider>{children}</QueryProvider>` dentro de `<body>`, con `attribute="class"`, `defaultTheme="light"` y `enableSystem={false}`. Toggle UI NO expuesto en release V1 (forward-compatibilidad de tokens sin requerir switch de UI; toggle UI opcional V2).
+> **Estado V1**: la **paleta dark está documentada** (decisión CTO 2026-09-18, [`phase-01-decisions.md`](./plans/implementation/phase-01-decisions.md) §Decisión #2) y la matriz WCAG light queda certificada arriba. La **integración en runtime** (bloque `.dark` en `apps/front/src/app/globals.css`, `ThemeProvider` con `next-themes`, export de tokens a `tailwind.config.*`) está **pendiente de implementación**; no hay `apps/front/src/app/globals.css` ni `next-themes` en `apps/front/package.json` todavía. No afirmar implementación hasta que esos archivos existan.
 >
-> **Decisión arquitectónica**: ver [`phase-01-decisions.md`](./plans/implementation/phase-01-decisions.md) §Decisión #2 (CTO 2026-09-18). Setup de `next-themes` en [`phase-01-monorepo.md`](./implementation/v1/phase-01-monorepo.md) → Task 0.34.
+> Toggle UI NO expuesto en release V1 (forward-compatibilidad de tokens sin requerir switch de UI; toggle UI opcional V2).
 
 ### Tokens dark (24)
 
@@ -299,7 +299,7 @@ Pasos a seguir cuando se llegue a ese punto:
 
 ## Breakpoints responsive (Task 0.36)
 
-Tokens en `apps/web/src/app/globals.css` (`@theme`). Tailwind v4 CSS-first — no hay `tailwind.config.js`.
+Tokens previstos en `apps/front/src/app/globals.css` (`@theme`) cuando se inicialice Tailwind v4 CSS-first. No hay `tailwind.config.*` todavía; la sección queda como **pendiente de implementación** hasta que `apps/front/src/app/globals.css` exista.
 
 | Segmento | Viewport | Clase Tailwind | Token |
 |----------|----------|----------------|-------|
@@ -313,7 +313,7 @@ Ejemplo: `class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"` — 1 columna 
 
 - **Mínimo**: 44×44 CSS px en controles interactivos primarios (botones, icon buttons, toggles).
 - **Token**: `--spacing-touch: 2.75rem` (44px) en `@theme`.
-- **Implementación V1**: `@hismia/ui` `Button` usa `min-h-touch` / `size-touch` en todas las variantes de tamaño.
+- **Implementación V1**: `@hismia/ui` `Button` debe usar `min-h-touch` / `size-touch` en todas las variantes de tamaño. Pendiente hasta que `@hismia/ui` exista en `packages/`.
 - **Referencia**: WCAG 2.5.5 Target Size (Enhanced); Apple Human Interface Guidelines.
 - **Tests**: contract tests Task 0.36; axe en CI se delega a Task 16.163.
 

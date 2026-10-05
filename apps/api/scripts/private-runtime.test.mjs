@@ -31,6 +31,7 @@ function fixture() {
   const output = [];
   const io = {
     realpath: async (p) => p,
+    access: async () => {}, // synthetic executable; never launch a real child
     lstat: async (p) => {
       if (['/', root, `${root}/apps`, api].includes(p))
         return stat({ mode: 0o755, isFile: () => false, isDirectory: () => true });
@@ -596,8 +597,9 @@ test('API-only start uses child env, never credentials in argv, suppresses logs 
     return 0;
   };
   assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 0);
-  assert.deepEqual(received[1], ['--filter', '@hismia/api', 'dev']);
-  assert.equal(received[2].cwd, root);
+  assert.equal(received[0], `${api}/node_modules/.bin/nest`);
+  assert.deepEqual(received[1], ['start']);
+  assert.equal(received[2].cwd, api);
   assert.deepEqual(received[2].stdio, 'ignore');
   assert.equal(received[2].shell, false);
   assert.equal(received[2].env.DATABASE_URL, helper.runtimeUrl(password));
@@ -607,6 +609,30 @@ test('API-only start uses child env, never credentials in argv, suppresses logs 
   assert.deepEqual(f.output, ['PASS API_EXIT']);
   f.deps.spawn = async () => 7;
   f.output.length = 0;
+  assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
+  assert.deepEqual(f.output, ['FAIL API_EXIT']);
+});
+test('start requires the API-local executable and never falls back to root or global Nest', async () => {
+  const f = checker();
+  const local = `${api}/node_modules/.bin/nest`;
+  const attempts = [];
+  f.deps.io.access = async (path, mode) => {
+    attempts.push([path, mode]);
+    if (path !== local) throw new Error('not installed in API package');
+  };
+  f.deps.spawn = async (command, argv, options) => {
+    assert.equal(command, local);
+    assert.deepEqual(argv, ['start']);
+    assert.equal(options.cwd, api);
+    return 0;
+  };
+  assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 0);
+  assert.deepEqual(attempts, [[local, constants.X_OK]]);
+  f.output.length = 0;
+  f.deps.io.access = async () => {
+    throw new Error('missing binary');
+  };
+  f.deps.spawn = () => assert.fail('must not fall back');
   assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
   assert.deepEqual(f.output, ['FAIL API_EXIT']);
 });
@@ -667,36 +693,37 @@ test('start rejects missing listener acknowledgement, mock auth and unsafe env; 
   f.deps.spawn = async () => assert.fail('must not spawn');
   assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
 });
-test('transaction URL preserves canonical restricted target and pgbouncer=true', () => {
-  requireHelper();
-  const tx = helper.runtimeUrl(password, undefined, 'tx');
-  const u = new URL(tx);
-  assert.equal(u.protocol, 'postgresql:');
-  assert.equal(u.username, 'hismia_api.zfpnjsbxrgbcehmefozb');
-  assert.equal(u.password, password);
-  assert.equal(u.hostname, 'aws-0-sa-east-1.pooler.supabase.com');
-  assert.equal(u.port, '6543');
-  assert.equal(u.pathname, '/postgres');
-  assert.equal(u.searchParams.get('pgbouncer'), 'true');
-  assert.equal(u.searchParams.get('sslmode'), 'disable');
-  assert.equal(u.searchParams.get('sslaccept'), null);
-  assert.equal(u.searchParams.get('sslcert'), null);
-  assert.equal(u.searchParams.get('application_name'), 'hismia-api');
-  assert.equal(helper.parseConfig(`DATABASE_URL=${tx}\n`), tx);
-  for (const bad of [
-    tx.replace('6543', '5432'),
-    tx.replace('pgbouncer=true', 'pgbouncer=false'),
-    tx.replace('sslmode=disable', 'sslmode=require'),
-    tx.replace('hismia_api', 'postgres'),
-    tx.replace('pgbouncer=true', 'pgbouncer=true&sslmode=require'),
-  ])
-    assert.throws(() => helper.parseConfig(`DATABASE_URL=${bad}\n`));
+test('legacy transaction TLS bypass is rejected before any child or client launch', async () => {
+  const f = checker();
+  const insecure = `postgresql://hismia_api.zfpnjsbxrgbcehmefozb:${password}@aws-0-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=disable&connection_limit=2&connect_timeout=5&pool_timeout=5&schema=profile_private&application_name=hismia-api`;
+  f.files.get(file).content = `DATABASE_URL=${insecure}\n`;
+  f.deps.spawn = () => assert.fail('must not launch');
+  assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
+  assert.deepEqual(f.output, ['FAIL CONFIG']);
+  assert.equal(f.options(), undefined);
+  assert.throws(() => helper.runtimeUrl(password, undefined, 'tx'));
+  assert.throws(() => helper.parseConfig(`DATABASE_URL=${insecure}\n`));
 });
-test('parseConfig accepts either Session strict or Transaction pgbouncer canonical URL', () => {
-  requireHelper();
-  const session = helper.runtimeUrl(password);
-  const tx = helper.runtimeUrl(password, undefined, 'tx');
-  assert.equal(helper.parseConfig(`DATABASE_URL=${session}\n`), session);
-  assert.equal(helper.parseConfig(`DATABASE_URL=${tx}\n`), tx);
-  assert.throws(() => helper.parseConfig(`DATABASE_URL=${tx.replace('6543', '6553')}\n`));
+test('config is data, not shell code, including at the dev entrypoint', async () => {
+  const f = checker();
+  f.files.get(file).content =
+    `DATABASE_URL=${helper.runtimeUrl(password)};$(touch /synthetic-marker)\n`;
+  f.deps.spawn = () => assert.fail('must not launch');
+  assert.equal(await helper.run(['start', '--ack-api-listener'], f.deps), 1);
+  assert.deepEqual(f.output, ['FAIL CONFIG']);
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, resolve } = await import('node:path');
+  const entry = resolve(dirname(fileURLToPath(import.meta.url)), '../dev.sh');
+  assert.doesNotMatch(readFileSync(entry, 'utf8'), /\bsource\s|\b\.\s+\.env|\b(?:eval|pnpm)\b/);
+  const { spawnSync } = await import('node:child_process');
+  const result = spawnSync('bash', [entry, '--unexpected'], {
+    env: { PATH: process.env.PATH },
+    encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0);
+  assert.doesNotMatch(
+    result.stdout + result.stderr,
+    /postgresql:|synthetic-marker|fixed_nonsecret/,
+  );
 });
