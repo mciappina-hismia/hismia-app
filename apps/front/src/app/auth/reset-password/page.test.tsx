@@ -36,41 +36,41 @@ async function readyWithSession(): Promise<void> {
     error: null,
   });
   render(<ResetPassword />);
-  await screen.findByRole('heading', { name: /set new password/i });
+  await screen.findByRole('heading', { name: /establecer nueva contraseña/i });
 }
 
 describe('reset password', () => {
   it('shows a pending state while checking the recovery session', async () => {
     getSession.mockImplementation(() => new Promise(() => {}));
     render(<ResetPassword />);
-    expect(await screen.findByText(/checking your recovery session/i)).toBeInTheDocument();
+    expect(await screen.findByText(/verificando tu sesión de recuperación/i)).toBeInTheDocument();
   });
 
   it('shows a recovery link required page when there is no recovery session', async () => {
     getSession.mockResolvedValue({ data: { session: null }, error: null });
     render(<ResetPassword />);
     expect(
-      await screen.findByRole('heading', { name: /recovery link required/i }),
+      await screen.findByRole('heading', { name: /necesitás un enlace/i }),
     ).toBeInTheDocument();
   });
 
   it('rejects short passwords without calling Supabase', async () => {
     await readyWithSession();
-    fireEvent.input(screen.getByLabelText(/new password/i), {
+    fireEvent.input(screen.getByLabelText(/nueva contraseña/i), {
       target: { value: 'short' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /update password/i }));
-    expect(await screen.findByText(/password must be at least/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
+    expect(await screen.findByText(/la contraseña debe tener al menos/i)).toBeInTheDocument();
     expect(updateUser).not.toHaveBeenCalled();
   });
 
   it('calls updateUser, signs out the recovery session and redirects to /login', async () => {
     updateUser.mockResolvedValue({ data: { user: {} }, error: null });
     await readyWithSession();
-    fireEvent.input(screen.getByLabelText(/new password/i), {
+    fireEvent.input(screen.getByLabelText(/nueva contraseña/i), {
       target: { value: 'new-strong-password' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /update password/i }));
+    fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
     expect(updateUser).toHaveBeenCalledWith({ password: 'new-strong-password' });
     expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
@@ -82,17 +82,17 @@ describe('reset password', () => {
       error: new Error('same_password'),
     });
     await readyWithSession();
-    fireEvent.input(screen.getByLabelText(/new password/i), {
+    fireEvent.input(screen.getByLabelText(/nueva contraseña/i), {
       target: { value: 'new-strong-password' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /update password/i }));
-    expect(await screen.findByText(/password update unavailable/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
+    expect(await screen.findByText(/no se pudo actualizar la contraseña/i)).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 
   it('shows setup required when no Supabase client is configured', async () => {
     browserAuth.mockReturnValue(null);
     render(<ResetPassword />);
-    expect(await screen.findByText(/setup required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/configuración requerida/i)).toBeInTheDocument();
   });
 });

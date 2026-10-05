@@ -16,7 +16,6 @@ beforeEach(() => {
   resetPasswordForEmail.mockReset();
   browserAuth.mockReset();
   browserAuth.mockReturnValue({ auth: { resetPasswordForEmail } });
-  // jsdom defaults window.location.origin to "http://localhost:3000"
 });
 
 afterEach(cleanup);
@@ -27,8 +26,10 @@ describe('recover password', () => {
     fireEvent.input(screen.getByLabelText(/email/i), {
       target: { value: 'not-an-email' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
-    expect(await screen.findByText(/check your email address/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
+    expect(
+      await screen.findByText(/revisa el email que ingresaste|revisa tu email/i),
+    ).toBeInTheDocument();
     expect(resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
@@ -37,7 +38,7 @@ describe('recover password', () => {
     fireEvent.input(screen.getByLabelText(/email/i), {
       target: { value: '  user@example.test  ' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
     await waitFor(() =>
       expect(resetPasswordForEmail).toHaveBeenCalledWith(
         'user@example.test',
@@ -52,8 +53,8 @@ describe('recover password', () => {
     fireEvent.input(screen.getByLabelText(/email/i), {
       target: { value: 'user@example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
-    expect(await screen.findByText(/if this email can be recovered/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
+    expect(await screen.findByText(/si este email puede ser recuperado/i)).toBeInTheDocument();
     expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
   });
 
@@ -65,8 +66,8 @@ describe('recover password', () => {
     fireEvent.input(screen.getByLabelText(/email/i), {
       target: { value: 'user@example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
-    expect(await screen.findByText(/if this email can be recovered/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
+    expect(await screen.findByText(/si este email puede ser recuperado/i)).toBeInTheDocument();
   });
 
   it('shows setup required when no Supabase client is configured', async () => {
@@ -75,8 +76,8 @@ describe('recover password', () => {
     fireEvent.input(screen.getByLabelText(/email/i), {
       target: { value: 'user@example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
-    expect(await screen.findByText(/setup required/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
+    expect(await screen.findByText(/configuración requerida/i)).toBeInTheDocument();
     expect(resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
@@ -92,8 +93,8 @@ describe('recover password', () => {
     fireEvent.input(screen.getByLabelText(/email/i), {
       target: { value: 'user@example.test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
-    fireEvent.click(screen.getByRole('button', { name: /sending/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enviando/i }));
     expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
     resolve();
   });

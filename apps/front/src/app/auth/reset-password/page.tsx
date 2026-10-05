@@ -24,7 +24,10 @@ export default function ResetPassword(): React.ReactElement {
     let active = true;
     const auth = browserAuth();
     if (!auth) {
-      setStatus({ kind: 'error', message: 'Setup required. Contact the site administrator.' });
+      setStatus({
+        kind: 'error',
+        message: 'Configuración requerida. Contactá al administrador del sitio.',
+      });
       return;
     }
     void auth.auth
@@ -51,13 +54,16 @@ export default function ResetPassword(): React.ReactElement {
     if (password.length < MIN_PASSWORD_LENGTH) {
       setStatus({
         kind: 'error',
-        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+        message: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`,
       });
       return;
     }
     const auth = browserAuth();
     if (!auth) {
-      setStatus({ kind: 'error', message: 'Setup required. Contact the site administrator.' });
+      setStatus({
+        kind: 'error',
+        message: 'Configuración requerida. Contactá al administrador del sitio.',
+      });
       return;
     }
     submitting.current = true;
@@ -67,7 +73,7 @@ export default function ResetPassword(): React.ReactElement {
       if (error) {
         setStatus({
           kind: 'error',
-          message: 'Password update unavailable. Try requesting a new recovery link.',
+          message: 'No se pudo actualizar la contraseña. Solicitá un nuevo enlace de recuperación.',
         });
         return;
       }
@@ -79,7 +85,7 @@ export default function ResetPassword(): React.ReactElement {
     } catch {
       setStatus({
         kind: 'error',
-        message: 'Password update unavailable. Try requesting a new recovery link.',
+        message: 'No se pudo actualizar la contraseña. Solicitá un nuevo enlace de recuperación.',
       });
     } finally {
       submitting.current = false;
@@ -104,17 +110,18 @@ export default function ResetPassword(): React.ReactElement {
         <div className="grid w-full max-w-md gap-6 rounded-3xl border border-border bg-card p-8 shadow-xl shadow-primary-soft/40 sm:p-12">
           <header className="space-y-3">
             <h1 className="text-4xl leading-tight font-semibold tracking-tight text-heading">
-              Recovery link required
+              Necesitás un enlace de recuperación
             </h1>
             <p className="text-base leading-relaxed text-muted">
-              Open the recovery link from your email to set a new password.
+              Abrí el enlace de recuperación que te llegó por email para establecer una nueva
+              contraseña.
             </p>
           </header>
           <a
             href={RECOVERY_PATH}
             className="min-h-touch w-full rounded-xl bg-primary-strong px-4 py-3 text-base font-semibold text-primary-text transition-colors hover:bg-secondary-text text-center"
           >
-            Request a new link
+            Solicitar un nuevo enlace
           </a>
         </div>
       </main>
@@ -125,7 +132,7 @@ export default function ResetPassword(): React.ReactElement {
     status.kind === 'error'
       ? status.message
       : status.kind === 'submitting'
-        ? 'Updating your password…'
+        ? 'Actualizando tu contraseña…'
         : null;
 
   return (
@@ -133,16 +140,16 @@ export default function ResetPassword(): React.ReactElement {
       <div className="grid w-full max-w-md gap-6 rounded-3xl border-border bg-card p-8 shadow-xl shadow-primary-soft/40 sm:p-12">
         <header className="space-y-3">
           <h1 className="text-4xl leading-tight font-semibold tracking-tight text-heading">
-            Set new password
+            Establecer nueva contraseña
           </h1>
           <p className="text-base leading-relaxed text-muted">
-            Choose a new password for your Hismia account.
+            Elegí una nueva contraseña para tu cuenta de Hismia.
           </p>
         </header>
         <form onSubmit={submit} noValidate className="space-y-5">
           <div className="space-y-2">
             <label htmlFor="password" className="block text-sm font-medium text-fg">
-              New password
+              Nueva contraseña
             </label>
             <input
               id="password"
@@ -166,15 +173,15 @@ export default function ResetPassword(): React.ReactElement {
             disabled={status.kind === 'submitting'}
             className="min-h-touch w-full rounded-xl bg-primary-strong px-4 py-3 text-base font-semibold text-primary-text transition-colors hover:bg-secondary-text disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {status.kind === 'submitting' ? 'Updating…' : 'Update password'}
+            {status.kind === 'submitting' ? 'Actualizando…' : 'Actualizar contraseña'}
           </button>
         </form>
         <p className="text-sm leading-relaxed text-muted">
-          Want to keep your old password?{' '}
+          ¿Querés mantener tu contraseña actual?{' '}
           <a href="/login" className="text-primary-strong underline">
-            Sign in
+            Iniciá sesión
           </a>{' '}
-          with your current credentials.
+          con tu contraseña actual.
         </p>
       </div>
     </main>
