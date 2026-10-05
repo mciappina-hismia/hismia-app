@@ -10,12 +10,6 @@ const TARGET = 'hismia_api.zfpnjsbxrgbcehmefozb';
 const HOST = 'aws-0-sa-east-1.pooler.supabase.com';
 const QUERY =
   'sslmode=require&sslaccept=strict&connection_limit=2&connect_timeout=5&pool_timeout=5&schema=profile_private';
-// Transaction-mode pooler (pgbouncer=true on port 6543) is the supported
-// alternative when Session strict-TLS is blocked by the local engine. SCRAM
-// authentication and the same RLS/role apply; the connection string opts out
-// of TLS because the pooler terminates TLS only on the Session listener.
-const TX_QUERY =
-  'pgbouncer=true&sslmode=disable&connection_limit=2&connect_timeout=5&pool_timeout=5&schema=profile_private&application_name=hismia-api';
 const CA_PIN =
   '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA';
 const AUTH_KEYS = [
@@ -58,12 +52,8 @@ function canonicalCaPath(path) {
 }
 export function runtimeUrl(password, ca, mode) {
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(password)) fail();
-  if (mode === undefined) {
-    return `postgresql://${TARGET}:${password}@${HOST}:5432/postgres?${QUERY}${ca === undefined ? '' : `&sslcert=${encodeURIComponent(canonicalCaPath(ca))}`}`;
-  }
-  if (mode !== 'tx') fail();
-  if (ca !== undefined) fail();
-  return `postgresql://${TARGET}:${password}@${HOST}:6543/postgres?${TX_QUERY}`;
+  if (mode !== undefined) fail();
+  return `postgresql://${TARGET}:${password}@${HOST}:5432/postgres?${QUERY}${ca === undefined ? '' : `&sslcert=${encodeURIComponent(canonicalCaPath(ca))}`}`;
 }
 export function parseConfig(text) {
   if (typeof text !== 'string' || text.length > 1024) fail();
@@ -73,8 +63,7 @@ export function parseConfig(text) {
   // Canonical reconstruction rejects encoding tricks, duplicates, extra parameters,
   // URL normalization, alternate ports/users/targets and dotenv/shell syntax.
   const ca = url.searchParams.has('sslcert') ? url.searchParams.get('sslcert') : undefined;
-  const isTx = url.hostname === HOST && url.port === '6543';
-  const expected = isTx ? runtimeUrl(url.password, undefined, 'tx') : runtimeUrl(url.password, ca);
+  const expected = runtimeUrl(url.password, ca);
   if (match[1] !== expected || text !== `DATABASE_URL=${match[1]}\n`) fail();
   return match[1];
 }
@@ -463,8 +452,11 @@ export async function run(args, d) {
     // Deliberately allowlist, rather than forward ambient process state.
     const env = { PATH: d.env.PATH, HOME: d.env.HOME, NODE_ENV: 'development', DATABASE_URL: url };
     for (const key of AUTH_KEYS) if (d.env[key]) env[key] = d.env[key];
-    const code = await d.spawn('pnpm', ['--filter', '@hismia/api', 'dev'], {
-      cwd: d.root,
+    const apiRoot = join(d.root, 'apps/api');
+    const nest = join(apiRoot, 'node_modules/.bin/nest');
+    await d.io.access(nest, constants.X_OK);
+    const code = await d.spawn(nest, ['start'], {
+      cwd: apiRoot,
       env,
       shell: false,
       stdio: 'ignore',

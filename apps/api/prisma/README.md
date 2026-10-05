@@ -140,7 +140,11 @@ part of this source change. No account/profile data is seeded or inserted.
    ```
 
    This passes the private URL only in the allowlisted child environment to fixed
-   `pnpm --filter @hismia/api dev`, never root recursive dev or frontend. No URL is
+   the installed API-only `node_modules/.bin/nest start` from `apps/api`, never the
+   package `dev` script, root recursive dev or frontend. `apps/api/dev.sh` delegates
+   to the same helper without sourcing `.env` or `.env.runtime.local`; arguments
+   other than the fixed acknowledgment are rejected before reading private files.
+   No URL is
    in argv; no migration is run. Child stdin/stdout/stderr are suppressed because
    arbitrary framework errors may contain credentials. The helper waits for exit
    and reports only `PASS API_EXIT` or failure, never readiness from spawn.
@@ -152,7 +156,13 @@ The fixed Session pooler endpoint is
 `aws-0-sa-east-1.pooler.supabase.com:5432`, database `postgres`, transport username
 `hismia_api.zfpnjsbxrgbcehmefozb`, actual database role `hismia_api`.
 Prisma 6 uses `sslmode=require&sslaccept=strict`, a pool of two, and five-second
-connect/pool timeouts. No TLS bypass or privileged postgres template is accepted.
+connect/pool timeouts. No TLS bypass or privileged postgres template is accepted. Legacy Transaction
+pooler URLs with `sslmode=disable` are rejected even when they have the expected
+restricted username. This helper supports only the canonical strict Session
+pooler path; Transaction-mode strict TLS is not established by the available
+local evidence. The prior restricted live Session check still failed with
+`TRANSACTION_P1011`; synthetic strict-CA tests and the separate Node TLS probe
+do not prove Prisma connectivity or identify the precise remote TLS cause.
 The config parser permits exactly one canonical unquoted DATABASE_URL line, not
 shell evaluation, extra keys or URL options. Inherited DB/PG/Prisma, Node injection,
 TLS override and diagnostic environments are rejected; unrelated keys are not
