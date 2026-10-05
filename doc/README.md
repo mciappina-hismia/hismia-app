@@ -1,6 +1,12 @@
 # Alcance conceptual del MVP de Hismia
 
-Este documento conserva el alcance y los bloqueos existentes; [ARQUITECTURA.md](ARQUITECTURA/ARQUITECTURA.md) explica las responsabilidades conceptuales y [TECNOLOGIAS.md](TECNOLOGIAS/TECNOLOGIAS.md) presenta las herramientas sin afirmar una implementación.
+Este documento conserva el alcance y los bloqueos existentes; [ARQUITECTURA.md](ARQUITECTURA/ARQUITECTURA.md) explica las responsabilidades conceptuales y [TECNOLOGIAS.md](TECNOLOGIAS/TECNOLOGIAS.md) presenta las herramientas sin presumir que todas las integraciones estén operativas.
+
+## Estado de implementación de la unidad 2 (no modifica el alcance)
+
+- **Implementado en código:** T1, contratos compartidos y validación de edad adulta; T2, identidad confirmada en API; T4a, alta, ingreso y confirmación PKCE en frontend. El flujo T4a usa sesión persistida por el SDK en el navegador; no implica SSR ni cookies HttpOnly.
+- **Sin aceptación integral:** T3 tiene fuente de persistencia, pero faltan conexión con TLS estricto y prueba integrada. T4b no recopila ni guarda perfiles: el onboarding actual es un placeholder. T5, lectura y edición de perfiles propios, queda excluido de esta recuperación.
+- **Evidencia limitada:** la entrega en `develop` mediante merge `074994f` no acredita aceptación completa. Históricamente, 50/50 tests de frontend y lint independiente pasaron; el lint incorporado al build de Next falló. No hay prueba de integración real ni verificación en navegador. Las condiciones de aceptación de las unidades propuestas más abajo siguen vigentes; el seguimiento operativo local está en `odd/tasks/auth-only-mvp-2.md` (no publicado en Git).
 
 ## Resultado buscado
 
