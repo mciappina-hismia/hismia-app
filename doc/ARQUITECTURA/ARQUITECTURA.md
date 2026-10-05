@@ -16,6 +16,7 @@ Para evitar que las decisiones de acceso dependan del sabor del momento, todo el
 La autorización nunca se delega al frontend: el backend verifica la firma del JWT contra el JWKS público de Supabase y, sobre esa identidad verificada, ejecuta la `policy evaluation`. Un token válido **no** autoriza por sí solo; el backend aplica las suyas propias sobre paciente, recurso, acción, vigencia del grant y autoría.
 
 **Reglas formales, no inferidas:**
+
 - Una cuenta confirmada con email verificado **no es** un grant profesional ni un rol administrativo.
 - El tipo elegido durante el alta es **preferencia de onboarding**, no autoridad. La autoridad la da la `policy evaluation` por objeto y acción.
 - Una `role` o `claim` del token que no esté validada contra el recurso solicitado **no** eleva privilegios (anti-BOLA/BFLA, OWASP API1/API5:2023).
@@ -51,27 +52,63 @@ User agent → frontend (Next.js) → backend (NestJS/Fastify) → Supabase Auth
 
 ### STRIDE (seguridad)
 
-| Categoría | Amenaza concreta | Control verificable |
-|---|---|---|
-| **Spoofing** | Token JWT forjado o de un emisor distinto a Supabase; bearer token robado reutilizado como otro sujeto. | Verificación de firma contra JWKS público de Supabase con `jose`; comparación de `iss`, `aud=authenticated` y `sub`; rotación de JWKS por TTL corto. |
-| **Tampering** | Alteración de `scope`, `authorization_details` (futuro), o `subject_id` en el body para acceder a otro recurso. | El backend deriva el sujeto persistido desde la identidad verificada del JWT, nunca desde el body; validación Zod de forma con allowlist; RLS por `subject_id`. |
-| **Repudiation** | El profesional niega haber leído o escrito una nota clínica. | Auditoría con `request_id`, `subject_id` (hasheado), `resource_id`, `action`, timestamp; retención definida por política; sin PII clínica en logs. |
-| **Information disclosure** | Filtración de tokens por URL, history del navegador, logs o telemetría; fingerprint del endpoint de health que revela versión. | `Authorization` header sólo (sin query string); redactores en logs; `/health` sin fingerprint de versión ni stack; mensajes de error genéricos al exterior. |
-| **Denial of service** | Abuso del endpoint de onboarding, JWT introspection costosa, fuerza bruta en `/login`/`/signup`. | Rate-limit por endpoint sensible (no sólo global), paginación capada, timeouts en JWKS y Prisma, circuit breaker sobre Supabase Auth. |
-| **Elevation of privilege** | BOLA: sujeto A opera sobre recursos del sujeto B. BFLA: cuenta confirmada con email intenta rutas admin o profesionales. | `policy evaluation` por objeto, acción y propiedad en cada request; tests negativos cross-subject; tabla de claims mínimas; ningún claim eleva privilegios sin re-evaluación backend. |
+| Categoría                  | Amenaza concreta                                                                                                               | Control verificable                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Spoofing**               | Token JWT forjado o de un emisor distinto a Supabase; bearer token robado reutilizado como otro sujeto.                        | Verificación de firma contra JWKS público de Supabase con `jose`; comparación de `iss`, `aud=authenticated` y `sub`; rotación de JWKS por TTL corto.                                  |
+| **Tampering**              | Alteración de `scope`, `authorization_details` (futuro), o `subject_id` en el body para acceder a otro recurso.                | El backend deriva el sujeto persistido desde la identidad verificada del JWT, nunca desde el body; validación Zod de forma con allowlist; RLS por `subject_id`.                       |
+| **Repudiation**            | El profesional niega haber leído o escrito una nota clínica.                                                                   | Auditoría con `request_id`, `subject_id` (hasheado), `resource_id`, `action`, timestamp; retención definida por política; sin PII clínica en logs.                                    |
+| **Information disclosure** | Filtración de tokens por URL, history del navegador, logs o telemetría; fingerprint del endpoint de health que revela versión. | `Authorization` header sólo (sin query string); redactores en logs; `/health` sin fingerprint de versión ni stack; mensajes de error genéricos al exterior.                           |
+| **Denial of service**      | Abuso del endpoint de onboarding, JWT introspection costosa, fuerza bruta en `/login`/`/signup`.                               | Rate-limit por endpoint sensible (no sólo global), paginación capada, timeouts en JWKS y Prisma, circuit breaker sobre Supabase Auth.                                                 |
+| **Elevation of privilege** | BOLA: sujeto A opera sobre recursos del sujeto B. BFLA: cuenta confirmada con email intenta rutas admin o profesionales.       | `policy evaluation` por objeto, acción y propiedad en cada request; tests negativos cross-subject; tabla de claims mínimas; ningún claim eleva privilegios sin re-evaluación backend. |
 
 ### LINDDUN (privacidad)
 
-| Categoría | Riesgo concreto | Control verificable |
-|---|---|---|
-| **Linking** | `sub` estable correlaciona actividad entre APIs y tenants. | Sub pairwise/pseudónimo por audiencia cuando aplique; audiences explícitas por API/tenant. |
-| **Identifying** | Claims del token exponen identidad o tenant. | Minimización de claims; uso de reference tokens o JWT cifrado cuando los datos son sensibles. |
-| **Non-repudiation** | Logs inmutables se vuelven evidencia de comportamiento sensible. | Hasheo/tokenización de identificadores; retención por clase de dato; acceso mínimo al log store. |
-| **Detecting** | Mensajes de error distintos permiten enumerar pacientes o grants. | Errores externos genéricos con `documentation: X.Y`; mensajes internos con clase real para el bounded context. |
-| **Disclosure** | Tokens, consentimientos y detalles de grant exponen datos sensibles. | Consentimientos con campos mínimos; redacción en logs; TLS estricto (ver `doc/TECNOLOGIAS.md`); acceso mínimo. |
-| **Unawareness** | El usuario no entiende duración, alcance o revocación del grant. | Pantalla de consentimiento con recurso, acción, duración y receptor visibles; panel de revocación inmediata. |
-| **Non-compliance** | Recolección y retención exceden el consentimiento. | Mapeo por scope/campo de propósito, retención y dueño de política; auditoría anual. |
+| Categoría           | Riesgo concreto                                                      | Control verificable                                                                                            |
+| ------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Linking**         | `sub` estable correlaciona actividad entre APIs y tenants.           | Sub pairwise/pseudónimo por audiencia cuando aplique; audiences explícitas por API/tenant.                     |
+| **Identifying**     | Claims del token exponen identidad o tenant.                         | Minimización de claims; uso de reference tokens o JWT cifrado cuando los datos son sensibles.                  |
+| **Non-repudiation** | Logs inmutables se vuelven evidencia de comportamiento sensible.     | Hasheo/tokenización de identificadores; retención por clase de dato; acceso mínimo al log store.               |
+| **Detecting**       | Mensajes de error distintos permiten enumerar pacientes o grants.    | Errores externos genéricos con `documentation: X.Y`; mensajes internos con clase real para el bounded context. |
+| **Disclosure**      | Tokens, consentimientos y detalles de grant exponen datos sensibles. | Consentimientos con campos mínimos; redacción en logs; TLS estricto (ver `doc/TECNOLOGIAS.md`); acceso mínimo. |
+| **Unawareness**     | El usuario no entiende duración, alcance o revocación del grant.     | Pantalla de consentimiento con recurso, acción, duración y receptor visibles; panel de revocación inmediata.   |
+| **Non-compliance**  | Recolección y retención exceden el consentimiento.                   | Mapeo por scope/campo de propósito, retención y dueño de política; auditoría anual.                            |
 
 ### Pruebas negativas mínimas por flujo clínico
 
 Toda ruta que opere grants, notas o PDF clínicos debe sumar tests negativos a su rúbrica TDD: token alterado, `aud` distinto, `sub` cruzado, grant revocado usado, scope expansion, rate-limit excedido, error 500 que filtra stack. La ausencia de estos tests bloquea el cierre de la unidad.
+
+## Flujo de recuperación de contraseña
+
+El flujo de recuperación sigue el mismo patrón que la confirmación de signup: Supabase Auth lo maneja end-to-end vía el SDK `@supabase/supabase-js` desde el front. El backend Nest **no tiene endpoints** para recovery; solo valida el JWT después de que el usuario está autenticado. Esto es consistente con la separación hexagonal del proyecto: las rutas del front que no tienen backend no tienen service asociado, y las operaciones de identidad (signup, recovery, email change) son responsabilidad de Supabase Auth, no del bounded context `auth` del backend.
+
+### Pasos del flow
+
+1. **Trigger**: el usuario hace click en "Forgot password?" en `/login` (cuando se implemente) o navega directamente a `/auth/recover`.
+2. **Submit email** (`/auth/recover`): el front llama `supabase.auth.resetPasswordForEmail(email, { redirectTo })`. Supabase manda un email con un link a `{redirectTo}?type=recovery&access_token=...&refresh_token=...`. El redirectTo configurado es `${window.location.origin}/auth/reset-password`. Independientemente de si el email existe o no en `auth.users`, la UI muestra un mensaje neutro ("Si este email puede resetearse, vas a recibir un link") para no permitir enumerar cuentas.
+3. **Click en el link**: el usuario abre el link. El SDK de Supabase parsea los tokens del URL fragment y establece una sesión de recovery.
+4. **Set new password** (`/auth/reset-password`): el front lee la sesión de recovery vía `browserAuth().auth.getSession()` o `detectSessionInUrl()`. Si hay sesión, renderiza un form con un campo `password` (mínimo 6 caracteres, validado con `zod` o un resolver equivalente). El submit llama `supabase.auth.updateUser({ password })`. Si la respuesta es exitosa, redirige a `/onboarding` o `/` según el estado del usuario.
+5. **Logout implícito**: Supabase invalida la sesión de recovery cuando se completa el update. El usuario tiene que re-loguearse con la nueva password.
+
+### Authorization
+
+- Las dos rutas de recovery (`/auth/recover` y `/auth/reset-password`) son **públicas** en el sentido HTTP: no requieren JWT preexistente. La autorización está implícita en el token de recovery que Supabase genera y envía por email.
+- El backend **no tiene endpoints de recovery**. La separación es deliberada: si el usuario olvidó la password, no puede autenticarse contra el backend para resetearla; el reset es end-to-end via Supabase. Esto evita un ciclo de "necesito estar autenticado para recuperar mi autenticación".
+
+### Rate limiting
+
+`/auth/recover` debería tener un rate-limit estricto (anti-enumeración). En V1, Supabase Auth impone un rate-limit interno (~1 request por minuto por IP). Cuando se agregue backend custom, esto se mueve a `@fastify/rate-limit` con override específico.
+
+### Mensajería neutra
+
+El form de `/auth/recover` siempre muestra "Si este email puede resetearse, vas a recibir un link en los próximos minutos." Independientemente de si el email existe, si Supabase devolvió error o si todo OK. Esto evita enumeración de cuentas.
+
+### Tests
+
+- **Front**: `apps/front/src/app/auth/recover/page.test.tsx` y `apps/front/src/app/auth/reset-password/page.test.tsx`. Cubren el caso happy path y los casos de error (email inválido, sesión de recovery ausente, password muy corta, error de Supabase).
+- **Backend**: ninguno (no hay endpoints de recovery en el backend).
+
+### Out of scope (V1)
+
+- Localización de los emails de recovery (mismo template que `confirmation.html` aplica, no copy localizado).
+- Personalización del email de recovery: bloqueada por issue #14 (custom SMTP no configurado). El template `apps/api/supabase-templates/recovery.html` queda listo en el repo con los tokens de `doc/DESIGN/DESIGN.md`.
+- 2FA: fuera de scope para MVP.

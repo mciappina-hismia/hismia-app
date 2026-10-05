@@ -252,6 +252,24 @@ La **política objetivo de `tsconfig.json`** (flags estrictos, buenas prácticas
 
 Cuando el endpoint es trivial (ej. `/health` sin más que uptime), el `*.service.ts` igual existe: la separación service/controller es la regla, no la excepción. Si el endpoint no tiene service, se está saltando la convención.
 
+#### Endpoints del MVP
+
+| Ruta                   | Verbo | Backend                                | Front                                             | Auth               | Notas                                                |
+| ---------------------- | ----- | -------------------------------------- | ------------------------------------------------- | ------------------ | ---------------------------------------------------- |
+| `/health`              | GET   | `apps/api/src/health/`                 | —                                                 | público            | uptime + checks; sin fingerprint de versión ni stack |
+| `/auth/me`             | GET   | `apps/api/src/auth/auth.controller.ts` | `apps/front/src/lib/auth/browser.ts`              | Bearer JWT         | única ruta auth-only del backend                     |
+| `/profiles/onboarding` | POST  | `apps/api/src/profiles/`               | `apps/front/src/lib/profiles/client.ts`           | Bearer JWT         | crea perfil en `profile_private.profiles`            |
+| `/auth/confirm`        | —     | (Supabase Auth)                        | `apps/front/src/app/auth/confirm/page.tsx`        | link con token     | confirmación de signup                               |
+| `/auth/recover`        | —     | (Supabase Auth)                        | `apps/front/src/app/auth/recover/page.tsx`        | público            | solicita reset password                              |
+| `/auth/reset-password` | —     | (Supabase Auth)                        | `apps/front/src/app/auth/reset-password/page.tsx` | sesión de recovery | establece nueva password                             |
+
+Las rutas `/auth/*` no tienen endpoint backend porque Supabase Auth
+maneja el flow completo vía su SDK (`resetPasswordForEmail`,
+`updateUser`). El backend solo valida el JWT después de que el usuario
+está autenticado. La separación service/controller se respeta: cada
+endpoint del backend tiene su carpeta; las rutas del front que no
+tienen backend no tienen service asociado.
+
 ### 5.3 Frontend (Next.js)
 
 - **Next.js** = marco de aplicaciones web basado en React para las interfaces. Estrategia de renderizado, sesiones y versionado **no** decididos aún.
