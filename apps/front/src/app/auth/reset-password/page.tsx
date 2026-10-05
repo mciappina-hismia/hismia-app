@@ -91,7 +91,7 @@ export default function ResetPassword(): React.ReactElement {
       <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8 sm:px-8 sm:py-12">
         <div className="grid w-full max-w-md gap-6 rounded-3xl border border-border bg-card p-8 shadow-xl shadow-primary-soft/40 sm:p-12">
           <p role="status" aria-live="polite" className="text-base leading-relaxed text-muted">
-            Checking your recovery session…
+            Verificando tu sesión de recuperación…
           </p>
         </div>
       </main>
