@@ -57,9 +57,7 @@ describe('direct signup', () => {
         password: 'test-password',
         options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
       });
-      expect(
-        await screen.findByText(/check your email for a confirmation link/i),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/recibirás un enlace de confirmación/i)).toBeInTheDocument();
       expect(screen.getByLabelText('Contraseña')).toHaveValue('');
       expect(window.sessionStorage.getItem('hismia.onboarding.accountType')).toBe(type);
     },
@@ -70,9 +68,7 @@ describe('direct signup', () => {
     render(<Signup />);
     submit('patient');
     await waitFor(() => expect(signOut).toHaveBeenCalledWith({ scope: 'local' }));
-    expect(screen.getByRole('status')).not.toHaveTextContent(
-      /check your email for a confirmation link/i,
-    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/recibirás un enlace de confirmación/i);
     expect(screen.getByLabelText('Contraseña')).toHaveValue('');
     expect(window.sessionStorage.getItem('hismia.onboarding.accountType')).toBeNull();
   });
@@ -81,14 +77,20 @@ describe('direct signup', () => {
     render(<Signup />);
     submit('');
     expect(signUp).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent(/check your email, password/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/revisa los campos indicados/i);
+    const type = screen.getByLabelText('Tipo de cuenta');
+    expect(type).toHaveAttribute('aria-invalid', 'true');
+    expect(type).toHaveAccessibleDescription(
+      'Esta es una preferencia de onboarding, no un permiso o rol verificado. Elige un tipo de cuenta.',
+    );
+    expect(type).toHaveFocus();
   });
 
   it('shows setup required without calling the SDK when public configuration is absent', () => {
     browserAuth.mockReturnValue(null);
     render(<Signup />);
     submit('patient');
-    expect(screen.getByRole('status')).toHaveTextContent(/setup required/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/configuración requerida/i);
     expect(signUp).not.toHaveBeenCalled();
   });
 
@@ -104,10 +106,9 @@ describe('direct signup', () => {
     submit('patient');
     fireEvent.submit(screen.getByRole('button', { name: /por favor, espere/i }).closest('form')!);
     expect(signUp).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent('Creando tu cuenta…');
     finish?.({ data: { session: null }, error: null });
-    expect(
-      await screen.findByText(/check your email for a confirmation link/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/recibirás un enlace de confirmación/i)).toBeInTheDocument();
   });
 
   it('keeps a generic message when local session disposal fails', async () => {
@@ -117,18 +118,14 @@ describe('direct signup', () => {
     submit('patient');
     await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
     expect(screen.queryByText(/synthetic sensitive error/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).not.toHaveTextContent(
-      /check your email for a confirmation link/i,
-    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/recibirás un enlace de confirmación/i);
   });
 
   it('uses generic pending text even on SDK errors', async () => {
     signUp.mockRejectedValue(new Error('sensitive provider error'));
     render(<Signup />);
     submit('patient');
-    expect(
-      await screen.findByText(/check your email for a confirmation link/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/recibirás un enlace de confirmación/i)).toBeInTheDocument();
     expect(screen.queryByText(/sensitive provider error/i)).not.toBeInTheDocument();
   });
 });

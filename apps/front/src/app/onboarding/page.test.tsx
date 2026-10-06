@@ -74,30 +74,33 @@ describe('confirmed onboarding gate', () => {
       error: null,
     });
     render(<Onboarding />);
-    expect(await screen.findByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/login');
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toHaveAttribute(
+      'href',
+      '/login',
+    );
     expect(getSession).not.toHaveBeenCalled();
     cleanup();
     getSession.mockResolvedValueOnce({ data: { session: null }, error: null });
     render(<Onboarding />);
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(verifyAccount).not.toHaveBeenCalled();
   });
   it('fails closed when session retrieval throws', async () => {
     getSession.mockRejectedValueOnce(new Error('synthetic SDK failure'));
     render(<Onboarding />);
-    expect(await screen.findByText(/account verification unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo verificar tu cuenta/i);
     expect(verifyAccount).not.toHaveBeenCalled();
   });
   it('denies API 401, ignores forged preference and fails closed on unavailable API', async () => {
     window.sessionStorage.setItem('hismia.onboarding.accountType', 'admin');
     verifyAccount.mockResolvedValueOnce({ kind: 'signin' });
     render(<Onboarding />);
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(screen.queryByText(/Form ready/)).not.toBeInTheDocument();
     cleanup();
     verifyAccount.mockResolvedValueOnce({ kind: 'unavailable' });
     render(<Onboarding />);
-    expect(await screen.findByText(/account verification unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo verificar tu cuenta/i);
     expect(screen.queryByText(/Form ready/)).not.toBeInTheDocument();
   });
   it('rejects a getSession user identity mismatch without trusting its bearer', async () => {
@@ -106,13 +109,13 @@ describe('confirmed onboarding gate', () => {
       error: null,
     });
     render(<Onboarding />);
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(verifyAccount).not.toHaveBeenCalled();
   });
   it('rejects a confirmed-user/API subject mismatch before exposing the form', async () => {
     verifyAccount.mockResolvedValueOnce({ kind: 'ready', subject: 'other-subject' });
     render(<Onboarding />);
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(screen.queryByText(/Form ready/)).not.toBeInTheDocument();
   });
   it('clears a visible form on signout, keeps the draft on same-user token refresh, and refuses a switched account', async () => {
@@ -126,12 +129,12 @@ describe('confirmed onboarding gate', () => {
     callback?.('TOKEN_REFRESHED', { user: { id: 'synthetic-subject' } });
     expect(screen.getByText('Form ready:')).toBeInTheDocument();
     callback?.('SIGNED_OUT', null);
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     cleanup();
     render(<Onboarding />);
     expect(await screen.findByText('Form ready:')).toBeInTheDocument();
     callback?.('SIGNED_IN', { user: { id: 'another-subject' } });
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
   });
   it('discards a pre-submit API gate result when signout races it', async () => {
     let callback: ((event: string, session: null) => void) | undefined;
@@ -154,7 +157,7 @@ describe('confirmed onboarding gate', () => {
     await waitFor(() => expect(verifyAccount).toHaveBeenCalledTimes(2));
     callback?.('SIGNED_OUT', null);
     finish?.({ kind: 'ready', subject: 'synthetic-subject' });
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(authorized).not.toHaveBeenCalled();
     window.removeEventListener('synthetic-authorized', authorized);
   });
@@ -191,7 +194,7 @@ describe('confirmed onboarding gate', () => {
     await act(async () => {
       finish?.({ kind: 'ready', subject: 'synthetic-subject' });
     });
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(screen.queryByText(/Form ready/)).not.toBeInTheDocument();
   });
   it('ignores INITIAL_SESSION notification while pending without silently discarding a valid gate', async () => {
@@ -232,13 +235,13 @@ describe('confirmed onboarding gate', () => {
     await waitFor(() => expect(verifyAccount).toHaveBeenCalledOnce());
     callback?.('SIGNED_OUT', null);
     finish?.({ kind: 'ready', subject: 'synthetic-subject' });
-    expect(await screen.findByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /inicia sesión/i })).toBeInTheDocument();
     expect(screen.queryByText(/Form ready/)).not.toBeInTheDocument();
   });
   it('handles configuration failure and ignores late gate result after unmount', async () => {
     browserAuth.mockReturnValueOnce(null);
     render(<Onboarding />);
-    expect(await screen.findByRole('status')).toHaveTextContent(/setup required/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/configuración requerida/i);
     cleanup();
     let finish: ((result: { kind: 'ready'; subject: string }) => void) | undefined;
     verifyAccount.mockImplementationOnce(

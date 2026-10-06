@@ -33,6 +33,10 @@ describe('recover password', () => {
       await screen.findByText(/revisa el email que ingresaste|revisa tu email/i),
     ).toBeInTheDocument();
     expect(resetPasswordForEmail).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/email/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText(/email/i)).toHaveAccessibleDescription('Revisa tu email.');
+    expect(screen.getByLabelText(/email/i)).toHaveFocus();
+    expect(screen.getByRole('alert')).toHaveTextContent('Revisa tu email.');
   });
 
   it('trims whitespace before submitting', async () => {
@@ -55,7 +59,11 @@ describe('recover password', () => {
       target: { value: 'user@example.test' },
     });
     fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
-    expect(await screen.findByText(/si este email puede ser recuperado/i)).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /si este email puede ser recuperado/i,
+    );
+    expect(screen.getByLabelText(/email/i)).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
   });
 
@@ -97,6 +105,8 @@ describe('recover password', () => {
     fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
     fireEvent.click(screen.getByRole('button', { name: /enviando/i }));
     expect(resetPasswordForEmail).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Enviando el enlace de recuperación…');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     resolve();
   });
 });

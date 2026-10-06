@@ -47,6 +47,14 @@ describe('returning login', () => {
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'short' } });
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar Sesión' }));
     expect(signInWithPassword).not.toHaveBeenCalled();
+    const email = screen.getByLabelText('Email');
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveAccessibleDescription('Ingresa un email válido.');
+    expect(email).toHaveFocus();
+    expect(screen.getByLabelText('Contraseña')).toHaveAccessibleDescription(
+      'La contraseña debe tener al menos 6 caracteres.',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Revisa los campos indicados.');
   });
   it('keeps a single pending password request', async () => {
     let finish: ((value: unknown) => void) | undefined;
@@ -60,15 +68,17 @@ describe('returning login', () => {
     submit();
     fireEvent.submit(screen.getByRole('button', { name: /por favor, espere/i }).closest('form')!);
     expect(signInWithPassword).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent('Iniciando sesión…');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     finish?.({ error: new Error('synthetic') });
-    expect(await screen.findByText(/sign-in unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no se pudo iniciar sesión/i)).toBeInTheDocument();
   });
   it('denies unconfirmed identity after password authentication', async () => {
     render(<Login />);
     submit();
     await waitFor(() => expect(confirmedUser).toHaveBeenCalledOnce());
     expect(replace).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent(/confirm your email/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/confirma tu email/i);
   });
   it('hands off confirmed users without contacting Hismia API', async () => {
     confirmedUser.mockResolvedValue(true);

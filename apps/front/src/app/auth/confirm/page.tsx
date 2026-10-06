@@ -14,7 +14,8 @@ export default function Confirm(): React.ReactElement {
   // StrictMode replays this mounted instance's effect but preserves its ref.
   // A distinct visit gets its own ref and cannot inherit a stale exchange.
   const visit = useRef<Promise<boolean> | null>(null);
-  const [message, setMessage] = useState('Checking confirmation…');
+  const [message, setMessage] = useState('Verificando la confirmación…');
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true;
     const callback = new URL(window.location.href);
@@ -22,7 +23,8 @@ export default function Confirm(): React.ReactElement {
     const code = cleanCallbackUrl();
     const auth = browserAuth();
     if (!auth) {
-      setMessage('Setup required. Contact the site administrator.');
+      setFailed(true);
+      setMessage('Configuración requerida. Contacta al administrador del sitio.');
       return;
     }
     if (!visit.current) {
@@ -38,7 +40,10 @@ export default function Confirm(): React.ReactElement {
     void visit.current.then((valid) => {
       if (!active) return;
       if (valid) router.replace(ONBOARDING_PATH);
-      else setMessage('Confirmation unavailable. Sign in after confirming your email.');
+      else {
+        setFailed(true);
+        setMessage('Confirmación no disponible. Inicia sesión después de confirmar tu email.');
+      }
     });
     return () => {
       active = false;
@@ -46,11 +51,11 @@ export default function Confirm(): React.ReactElement {
   }, [router]);
   return (
     <main>
-      <h1>Confirm email</h1>
-      <p role="status" aria-live="polite">
+      <h1>Confirmar email</h1>
+      <p role={failed ? 'alert' : 'status'} aria-live={failed ? 'assertive' : 'polite'}>
         {message}
       </p>
-      <a href="/login">Sign in</a>
+      <a href="/login">Iniciar sesión</a>
     </main>
   );
 }
