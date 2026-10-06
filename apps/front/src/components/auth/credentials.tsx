@@ -114,10 +114,7 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
           className="hidden flex-col justify-between rounded-l-3xl bg-secondary p-12 lg:flex"
           aria-label="Acerca de Hismia"
         >
-          <p className="text-3xl font-bold tracking-tight" aria-label="Hismia">
-            <span className="text-brand-his">His</span>
-            <span className="text-brand-me">mia</span>
-          </p>
+          <img src="/brand/hismia-wordmark.svg" alt="Hismia" width={144} height={44} />
           <div className="py-16">
             <div
               className="mb-8 flex size-20 items-center justify-center rounded-3xl border border-primary/30 bg-primary-soft text-4xl font-semibold text-primary-strong"
