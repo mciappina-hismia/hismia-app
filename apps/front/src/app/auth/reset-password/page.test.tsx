@@ -1,47 +1,57 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import ResetPassword from './page';
+import type * as Browser from '../../../lib/auth/browser';
+import { RECOVERY_PATH, RESET_PASSWORD_PATH } from '../../../lib/auth/browser';
 
-const { getSession, updateUser, signOut, replace, browserAuth } = vi.hoisted(() => ({
-  getSession: vi.fn(),
-  updateUser: vi.fn(),
-  signOut: vi.fn(),
-  replace: vi.fn(),
-  browserAuth: vi.fn(),
-}));
+const { exchangeCodeForSession, getSession, updateUser, signOut, replace, browserAuth } =
+  vi.hoisted(() => ({
+    exchangeCodeForSession: vi.fn(),
+    getSession: vi.fn(),
+    updateUser: vi.fn(),
+    signOut: vi.fn(),
+    replace: vi.fn(),
+    browserAuth: vi.fn(),
+  }));
 
-vi.mock('../../../lib/auth/browser', () => ({
+vi.mock('../../../lib/auth/browser', async (importOriginal) => ({
+  ...(await importOriginal<typeof Browser>()),
   browserAuth,
-  ONBOARDING_PATH: '/onboarding',
-  RECOVERY_PATH: '/auth/recover',
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 
 beforeEach(() => {
-  getSession.mockReset();
+  window.history.replaceState(null, '', RESET_PASSWORD_PATH);
+  exchangeCodeForSession.mockReset().mockResolvedValue({
+    data: { session: { user: { id: 'synthetic-subject' } }, redirectType: 'recovery' },
+    error: null,
+  });
+  getSession.mockReset().mockResolvedValue({
+    data: { session: { user: { id: 'synthetic-subject' } } },
+    error: null,
+  });
   updateUser.mockReset();
   signOut.mockReset().mockResolvedValue({});
   replace.mockReset();
   browserAuth.mockReset();
   browserAuth.mockReturnValue({
-    auth: { getSession, updateUser, signOut },
+    auth: { exchangeCodeForSession, getSession, updateUser, signOut },
   });
 });
 
 afterEach(cleanup);
 
 async function readyWithSession(): Promise<void> {
-  getSession.mockResolvedValue({
-    data: { session: { access_token: 'recovery-token' } },
-    error: null,
-  });
+  window.history.replaceState(null, '', `${RESET_PASSWORD_PATH}?code=synthetic`);
   render(<ResetPassword />);
   await screen.findByRole('heading', { name: /establecer nueva contraseña/i });
 }
 
 describe('reset password', () => {
   it('shows a pending state while checking the recovery session', async () => {
-    getSession.mockImplementation(() => new Promise(() => {}));
+    window.history.replaceState(null, '', `${RESET_PASSWORD_PATH}?code=synthetic`);
+    exchangeCodeForSession.mockImplementation(() => new Promise(() => {}));
     render(<ResetPassword />);
     expect(await screen.findByText(/verificando tu sesión de recuperación/i)).toBeInTheDocument();
   });
@@ -52,6 +62,19 @@ describe('reset password', () => {
     expect(
       await screen.findByRole('heading', { name: /necesitás un enlace/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /solicitar un nuevo enlace/i })).toHaveAttribute(
+      'href',
+      RECOVERY_PATH,
+    );
+  });
+
+  it('does not admit an ordinary persisted session without a recovery callback', async () => {
+    getSession.mockResolvedValue({ data: { session: { access_token: 'ordinary' } }, error: null });
+    render(<ResetPassword />);
+    expect(
+      await screen.findByRole('heading', { name: /necesitás un enlace/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/nueva contraseña/i)).not.toBeInTheDocument();
   });
 
   it('rejects short passwords without calling Supabase', async () => {
@@ -88,6 +111,37 @@ describe('reset password', () => {
     fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
     expect(await screen.findByText(/no se pudo actualizar la contraseña/i)).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('exchanges once under StrictMode and scrubs callback data before completion', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `${RESET_PASSWORD_PATH}?code=synthetic&sb_flow_id=flow&next=https://elsewhere.test`,
+    );
+    render(
+      <StrictMode>
+        <ResetPassword />
+      </StrictMode>,
+    );
+    await screen.findByLabelText(/nueva contraseña/i);
+    expect(exchangeCodeForSession).toHaveBeenCalledOnce();
+    expect(exchangeCodeForSession).toHaveBeenCalledWith('synthetic', { flowId: 'flow' });
+    expect(window.location.search + window.location.hash).toBe('');
+  });
+
+  it('does not expose the form or repeat update when logout fails after saving', async () => {
+    updateUser.mockResolvedValue({ error: null });
+    signOut.mockResolvedValue({ error: new Error('synthetic') });
+    await readyWithSession();
+    fireEvent.input(screen.getByLabelText(/nueva contraseña/i), {
+      target: { value: 'new-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
+    expect(await screen.findByText(/tu contraseña cambió/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/nueva contraseña/i)).not.toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+    expect(updateUser).toHaveBeenCalledOnce();
   });
 
   it('shows setup required when no Supabase client is configured', async () => {

@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Login from './page';
+import type * as Browser from '../../lib/auth/browser';
+import { RECOVERY_PATH } from '../../lib/auth/browser';
 
 const { signInWithPassword, confirmedUser, replace } = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   confirmedUser: vi.fn(),
   replace: vi.fn(),
 }));
-vi.mock('../../lib/auth/browser', () => ({
+vi.mock('../../lib/auth/browser', async (importOriginal) => ({
+  ...(await importOriginal<typeof Browser>()),
   browserAuth: () => ({ auth: { signInWithPassword } }),
   confirmedUser,
-  ONBOARDING_PATH: '/onboarding',
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 beforeEach(() => {
@@ -31,6 +33,10 @@ describe('returning login', () => {
     render(<Login />);
     expect(screen.getByRole('heading', { level: 1, name: 'Iniciar Sesión' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Crear Cuenta' })).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: /olvidaste tu contraseña/i })).toHaveAttribute(
+      'href',
+      RECOVERY_PATH,
+    );
     expect(screen.getByLabelText('Email')).toHaveAttribute('autoComplete', 'email');
     expect(screen.getByLabelText('Contraseña')).toHaveAttribute('autoComplete', 'current-password');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();

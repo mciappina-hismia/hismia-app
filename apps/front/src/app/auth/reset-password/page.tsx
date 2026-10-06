@@ -4,7 +4,12 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { browserAuth, RECOVERY_PATH } from '../../../lib/auth/browser';
 
-const MIN_PASSWORD_LENGTH = 6;
+import {
+  consumeRecoveryCallback,
+  createRecovery,
+  supabaseRecovery,
+  MIN_PASSWORD_LENGTH,
+} from '../../../lib/auth/recovery';
 
 type Status =
   | { kind: 'pending' }
@@ -12,37 +17,32 @@ type Status =
   | { kind: 'ready' }
   | { kind: 'submitting' }
   | { kind: 'error'; message: string }
-  | { kind: 'saved' };
+  | { kind: 'saved' }
+  | { kind: 'unavailable'; message: string };
 
 export default function ResetPassword(): React.ReactElement {
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'pending' });
   const submitting = useRef(false);
+  const recovery = useRef<ReturnType<typeof createRecovery> | null>(null);
 
   useEffect(() => {
     let active = true;
+    // Capture before cleanup; the application instance shares the promise on effect replay.
+    const callback = consumeRecoveryCallback();
     const auth = browserAuth();
     if (!auth) {
       setStatus({
-        kind: 'error',
+        kind: 'unavailable',
         message: 'Configuración requerida. Contactá al administrador del sitio.',
       });
       return;
     }
-    void auth.auth
-      .getSession()
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error || !data.session) {
-          setStatus({ kind: 'no-recovery' });
-          return;
-        }
-        setStatus({ kind: 'ready' });
-      })
-      .catch(() => {
-        if (active) setStatus({ kind: 'no-recovery' });
-      });
+    recovery.current ??= createRecovery(supabaseRecovery(auth));
+    void recovery.current.open(callback).then((valid) => {
+      if (active) setStatus({ kind: valid ? 'ready' : 'no-recovery' });
+    });
     return () => {
       active = false;
     };
@@ -58,35 +58,31 @@ export default function ResetPassword(): React.ReactElement {
       });
       return;
     }
-    const auth = browserAuth();
-    if (!auth) {
-      setStatus({
-        kind: 'error',
-        message: 'Configuración requerida. Contactá al administrador del sitio.',
-      });
-      return;
-    }
+    if (!recovery.current || (status.kind !== 'ready' && status.kind !== 'error')) return;
     submitting.current = true;
     setStatus({ kind: 'submitting' });
     try {
-      const { error } = await auth.auth.updateUser({ password });
-      if (error) {
+      const result = await recovery.current.changePassword(password);
+      if (result === 'saved') {
+        setPassword('');
+        setStatus({ kind: 'saved' });
+        router.replace('/login');
+      } else if (result === 'signout-failed') {
+        setPassword('');
+        setStatus({
+          kind: 'unavailable',
+          message:
+            'Tu contraseña cambió, pero no se pudo cerrar la sesión local. Cerrá la sesión antes de volver a ingresar.',
+        });
+      } else if (result === 'no-recovery') {
+        setPassword('');
+        setStatus({ kind: 'no-recovery' });
+      } else {
         setStatus({
           kind: 'error',
           message: 'No se pudo actualizar la contraseña. Solicitá un nuevo enlace de recuperación.',
         });
-        return;
       }
-      setStatus({ kind: 'saved' });
-      // The recovery session is invalidated by Supabase once the password
-      // changes. Send the user to sign in with the new password.
-      await auth.auth.signOut({ scope: 'local' });
-      router.replace('/login');
-    } catch {
-      setStatus({
-        kind: 'error',
-        message: 'No se pudo actualizar la contraseña. Solicitá un nuevo enlace de recuperación.',
-      });
     } finally {
       submitting.current = false;
     }
@@ -100,6 +96,15 @@ export default function ResetPassword(): React.ReactElement {
             Verificando tu sesión de recuperación…
           </p>
         </div>
+      </main>
+    );
+  }
+
+  if (status.kind === 'unavailable' || status.kind === 'saved') {
+    return (
+      <main>
+        <p role="status">{status.kind === 'saved' ? 'Contraseña actualizada.' : status.message}</p>
+        <a href="/login">Iniciá sesión</a>
       </main>
     );
   }

@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { browserAuth, RECOVERY_PATH } from '../../../lib/auth/browser';
+import { browserAuth } from '../../../lib/auth/browser';
+import { requestRecovery, RECOVERY_MESSAGE } from '../../../lib/auth/recovery';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,17 +29,8 @@ export default function Recover(): React.ReactElement {
     setBusy(true);
     setMessage('');
     try {
-      const redirectTo = `${window.location.origin}${RECOVERY_PATH}`;
-      // Neutral messaging on purpose: the same response is returned whether
-      // or not the email matches an account. Prevents email enumeration.
-      await auth.auth.resetPasswordForEmail(trimmed, { redirectTo });
-      setMessage(
-        'Si este email puede ser recuperado, un enlace de recuperación llegará en los próximos minutos. Revisa tu carpeta de spam.',
-      );
-    } catch {
-      setMessage(
-        'Si este email puede ser recuperado, un enlace de recuperación llegará en los próximos minutos. Revisa tu carpeta de spam.',
-      );
+      await requestRecovery(auth, trimmed, window.location.origin);
+      setMessage(RECOVERY_MESSAGE);
     } finally {
       submitting.current = false;
       setBusy(false);
