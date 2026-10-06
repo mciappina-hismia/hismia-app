@@ -25,24 +25,53 @@ export default function Onboarding(): React.ReactElement {
       return;
     }
     authRef.current = auth;
-    // This callback is synchronous; never await Supabase SDK methods inside it.
-    const {
-      data: { subscription },
-    } = auth.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION') return;
-      // Before the first gate settles, a material auth event invalidates its in-flight result.
-      // Once settled, a same-account refresh keeps the draft; a switch or signout does not.
-      if (identity.current && event !== 'SIGNED_OUT' && session?.user?.id === identity.current)
-        return;
+    let initialPending = true;
+    let restoredSubject: string | null = null;
+    const invalidate = () => {
+      initialPending = false;
       generation.current++;
       identity.current = '';
       setSubject('');
       setState('login');
+    };
+    // This callback is synchronous; never await Supabase SDK methods inside it.
+    const {
+      data: { subscription },
+    } = auth.auth.onAuthStateChange((event, session) => {
+      if (!active || event === 'INITIAL_SESSION') return;
+      // SDK restoration emits SIGNED_IN before the initial gate can finish.
+      // Its subject only constrains that gate; the event never grants readiness.
+      if (
+        initialPending &&
+        event === 'SIGNED_IN' &&
+        session?.user?.id &&
+        (restoredSubject === null || restoredSubject === session.user.id)
+      ) {
+        restoredSubject = session.user.id;
+        // Keep immediate login-required presentation until the authoritative
+        // gate settles; matching restoration may recover, never a stale switch.
+        setState('login');
+        return;
+      }
+      // Once settled, same-account events keep the draft. Signout or a different
+      // pending restore subject invalidates immediately, including late gate results.
+      if (identity.current && event !== 'SIGNED_OUT' && session?.user?.id === identity.current)
+        return;
+      invalidate();
     });
     const initial = generation.current;
     void checkedAccount(auth.auth)
       .then((result) => {
         if (!active || initial !== generation.current) return;
+        initialPending = false;
+        if (
+          result.kind === 'ready' &&
+          restoredSubject !== null &&
+          restoredSubject !== result.subject
+        ) {
+          invalidate();
+          return;
+        }
         if (result.kind === 'ready') {
           identity.current = result.subject;
           setSubject(result.subject);
@@ -51,7 +80,10 @@ export default function Onboarding(): React.ReactElement {
         } else setState(result.kind === 'signin' ? 'login' : 'unavailable');
       })
       .catch(() => {
-        if (active && initial === generation.current) setState('unavailable');
+        if (active && initial === generation.current) {
+          initialPending = false;
+          setState('unavailable');
+        }
       });
     return () => {
       active = false;
