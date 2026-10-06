@@ -62,7 +62,88 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+function pendingInitialGate() {
+  let listener!: (event: string, session: { user: { id: string } } | null) => void;
+  let finish!: (result: ProfileClient.GateResult) => void;
+  onAuthStateChange.mockImplementation((callback) => {
+    listener = callback;
+    return { data: { subscription: { unsubscribe: vi.fn() } } };
+  });
+  verifyAccount.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const view = render(<Onboarding />);
+  return {
+    view,
+    emit: (event: string, subject: string | null) =>
+      act(() => {
+        listener(event, subject === null ? null : { user: { id: subject } });
+      }),
+    settle: (result: ProfileClient.GateResult = { kind: 'ready', subject: 'synthetic-subject' }) =>
+      act(async () => {
+        finish(result);
+      }),
+  };
+}
+
 describe('confirmed onboarding gate', () => {
+  it.each([1, 2])(
+    'reconciles %i same-account initial restore events only through the valid gate',
+    async (count) => {
+      const gate = pendingInitialGate();
+      await waitFor(() => expect(verifyAccount).toHaveBeenCalledOnce());
+      for (let index = 0; index < count; index++) gate.emit('SIGNED_IN', 'synthetic-subject');
+      expect(Boolean(screen.queryByText('Form ready:'))).toBe(false);
+      await gate.settle();
+      expect(Boolean(screen.queryByText('Form ready:'))).toBe(true);
+    },
+  );
+  it.each(['SIGNED_OUT', 'SIGNED_IN'] as const)(
+    'invalidates pending restoration immediately on %s and rejects its late gate',
+    async (event) => {
+      const gate = pendingInitialGate();
+      await waitFor(() => expect(verifyAccount).toHaveBeenCalledOnce());
+      gate.emit('SIGNED_IN', 'synthetic-subject');
+      gate.emit(event, event === 'SIGNED_OUT' ? null : 'different-account');
+      expect(Boolean(screen.queryByRole('link', { name: /inicia sesión/i }))).toBe(true);
+      // Returning to A cannot resurrect the invalidated original gate.
+      gate.emit('SIGNED_IN', 'synthetic-subject');
+      await gate.settle();
+      expect(Boolean(screen.queryByText('Form ready:'))).toBe(false);
+      expect(Boolean(screen.queryByRole('link', { name: /inicia sesión/i }))).toBe(true);
+    },
+  );
+  it('rejects a first restore event whose subject differs from the validated gate', async () => {
+    const gate = pendingInitialGate();
+    await waitFor(() => expect(verifyAccount).toHaveBeenCalledOnce());
+    gate.emit('SIGNED_IN', 'different-account');
+    expect(Boolean(screen.queryByRole('link', { name: /inicia sesión/i }))).toBe(true);
+    await gate.settle();
+    expect(Boolean(screen.queryByText('Form ready:'))).toBe(false);
+    expect(Boolean(screen.queryByRole('link', { name: /inicia sesión/i }))).toBe(true);
+  });
+  it.each(['signin', 'unavailable'] as const)(
+    'does not let matching restore metadata override a %s gate',
+    async (kind) => {
+      const gate = pendingInitialGate();
+      await waitFor(() => expect(verifyAccount).toHaveBeenCalledOnce());
+      gate.emit('SIGNED_IN', 'synthetic-subject');
+      await gate.settle({ kind, error: { category: 'authentication' } });
+      expect(Boolean(screen.queryByText('Form ready:'))).toBe(false);
+      expect(Boolean(screen.queryByRole('alert'))).toBe(true);
+    },
+  );
+  it('ignores a restored initial gate after unmount', async () => {
+    const gate = pendingInitialGate();
+    await waitFor(() => expect(verifyAccount).toHaveBeenCalledOnce());
+    gate.emit('SIGNED_IN', 'synthetic-subject');
+    gate.view.unmount();
+    await gate.settle();
+    expect(Boolean(screen.queryByText('Form ready:'))).toBe(false);
+  });
   it('checks getUser, then token transport and authoritative API before showing preference and form', async () => {
     window.sessionStorage.setItem('hismia.onboarding.accountType', 'professional');
     render(<Onboarding />);
