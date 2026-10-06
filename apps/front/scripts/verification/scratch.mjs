@@ -12,7 +12,8 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -38,7 +39,7 @@ const publicPaths = [
   'packages/validation/tsconfig.json',
 ];
 const excluded =
-  /^(?:\.env.*|\.git|\.svn|\.hg|\.next|\.cache|\.vite|\.turbo|\.pnpm|\.output|\.vercel|node_modules|dist|build|out|coverage|caches?|secrets?|credentials?|private[-_.]?runtime.*)$/i;
+  /^(?:\.env.*|\.git|\.svn|\.hg|\.next|\.cache|\.vite|\.turbo|\.pnpm|\.output|\.vercel|node_modules|dist|build|out|coverage|caches?|secrets?|credentials?|private[-_.]?runtime.*|\.?meta)$/i;
 const extensions = /\.(?:tsx?|[cm]?js|json|css|svg|png|jpe?g|webp|ico|woff2?|txt)$/i;
 const layouts = new WeakSet();
 function inside(root, file) {
@@ -262,9 +263,10 @@ export async function spawnOwned({
   if (!inside(scratch.root, cwd) || (await realpath(cwd)) !== cwd)
     throw new Error('Invalid owned cwd');
   const started = performance.now();
+  const environment = cleanEnvironment({ node, home: scratch.home, apiOrigin });
   const child = spawn(node, [scriptPath, ...args], {
     cwd,
-    env: cleanEnvironment({ node, home: scratch.home, apiOrigin }),
+    env: environment,
     detached: true,
     stdio: 'ignore',
     shell: false,
@@ -306,9 +308,54 @@ export async function spawnOwned({
     })();
     return stopping;
   }
+  // Readiness must attribute the listener to this exact child, not a port alone.
+  // lsof inspects only its IPv4 LISTEN socket; -nP disables name/service lookups.
+  // No file/process inventory, inherited environment, shell or raw tool output.
+  async function ownsListener(port, timeoutMs) {
+    if (ended || stopping || !child.pid) return false;
+    if (!Number.isInteger(port) || port < 1024 || port > 65535)
+      throw new Error('Invalid listener port');
+    for (const tool of ['/usr/sbin/lsof', '/usr/bin/lsof']) {
+      try {
+        const { stdout } = await promisify(execFile)(
+          tool,
+          [
+            '-nP',
+            '-a',
+            '-p',
+            String(child.pid),
+            '-i4TCP@127.0.0.1:' + port,
+            '-sTCP:LISTEN',
+            '-Fpn',
+          ],
+          {
+            cwd,
+            env: environment,
+            timeout: bounded(timeoutMs, 500),
+            killSignal: 'SIGKILL',
+            maxBuffer: 4096,
+          },
+        );
+        const fields = stdout.trim().split('\n');
+        return (
+          !ended &&
+          !stopping &&
+          fields.includes(`p${child.pid}`) &&
+          fields.includes(`n127.0.0.1:${port}`)
+        );
+      } catch (error) {
+        if (error.code === 'ENOENT') continue;
+        if (error.code === 1 || error.killed || error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER')
+          return false;
+        throw new Error('Listener ownership inspection failed');
+      }
+    }
+    throw new Error('Listener ownership tool unavailable');
+  }
   return Object.freeze({
     exit,
     stop,
+    ownsListener,
     get ended() {
       return ended;
     },
@@ -342,7 +389,10 @@ export async function runOwned(options) {
   return receipt;
 }
 
-/** Denies redirects; failure always stops the owned child before rejecting. */
+/** Requires system lsof and the exact owned child's loopback listener before AND
+ * after HTTP 200. No availability-check race or unrelated listener can prove readiness.
+ * Denies redirects; failure always stops the owned child before rejecting.
+ */
 export async function waitReady(owned, { origin, port, pathname = '/login', timeoutMs = 30_000 }) {
   try {
     loopbackOrigin(origin, port);
@@ -350,7 +400,13 @@ export async function waitReady(owned, { origin, port, pathname = '/login', time
     if (!['/login', '/auth/recover', '/'].includes(pathname))
       throw new Error('Invalid readiness path');
     const deadline = performance.now() + duration;
+    const probeTimeout = () => Math.min(500, Math.max(1, Math.ceil(deadline - performance.now())));
     while (!owned.ended && performance.now() < deadline) {
+      if (!(await owned.ownsListener(port, probeTimeout()))) {
+        await delay(25);
+        continue;
+      }
+      let ok = false;
       try {
         const response = await fetch(`${origin}${pathname}`, {
           redirect: 'manual',
@@ -359,16 +415,30 @@ export async function waitReady(owned, { origin, port, pathname = '/login', time
           ),
         });
         await response.body?.cancel();
-        if (response.status === 200) return;
+        ok = response.status === 200;
       } catch {
         /* Only retry this already validated loopback destination. */
       }
+      if (
+        ok &&
+        !owned.ended &&
+        performance.now() < deadline &&
+        (await owned.ownsListener(port, probeTimeout()))
+      )
+        return;
       await delay(25);
     }
     throw new Error('Readiness failed');
   } catch (error) {
     const receipt = await owned.stop();
-    if (error.message === 'Invalid loopback origin') throw failure(error.message, receipt);
+    if (
+      [
+        'Invalid loopback origin',
+        'Listener ownership tool unavailable',
+        'Listener ownership inspection failed',
+      ].includes(error.message)
+    )
+      throw failure(error.message, receipt);
     throw failure('Readiness failed', receipt);
   }
 }
