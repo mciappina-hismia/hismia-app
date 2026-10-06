@@ -25,6 +25,8 @@ export default function ResetPassword(): React.ReactElement {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'pending' });
   const submitting = useRef(false);
+  const passwordControl = useRef<HTMLInputElement>(null);
+  const [invalid, setInvalid] = useState(false);
   const recovery = useRef<ReturnType<typeof createRecovery> | null>(null);
 
   useEffect(() => {
@@ -51,7 +53,10 @@ export default function ResetPassword(): React.ReactElement {
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (submitting.current) return;
+    setInvalid(false);
     if (password.length < MIN_PASSWORD_LENGTH) {
+      setInvalid(true);
+      passwordControl.current?.focus();
       setStatus({
         kind: 'error',
         message: `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`,
@@ -103,7 +108,9 @@ export default function ResetPassword(): React.ReactElement {
   if (status.kind === 'unavailable' || status.kind === 'saved') {
     return (
       <main>
-        <p role="status">{status.kind === 'saved' ? 'Contraseña actualizada.' : status.message}</p>
+        <p role={status.kind === 'saved' ? 'status' : 'alert'}>
+          {status.kind === 'saved' ? 'Contraseña actualizada.' : status.message}
+        </p>
         <a href="/login">Iniciá sesión</a>
       </main>
     );
@@ -113,7 +120,7 @@ export default function ResetPassword(): React.ReactElement {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-bg px-4 py-8 sm:px-8 sm:py-12">
         <div className="grid w-full max-w-md gap-6 rounded-3xl border border-border bg-card p-8 shadow-xl shadow-primary-soft/40 sm:p-12">
-          <header className="space-y-3">
+          <header role="alert" className="space-y-3">
             <h1 className="text-4xl leading-tight font-semibold tracking-tight text-heading">
               Necesitás un enlace de recuperación
             </h1>
@@ -151,13 +158,21 @@ export default function ResetPassword(): React.ReactElement {
             Elegí una nueva contraseña para tu cuenta de Hismia.
           </p>
         </header>
-        <form onSubmit={submit} noValidate className="space-y-5">
+        <form
+          onSubmit={submit}
+          noValidate
+          aria-busy={status.kind === 'submitting'}
+          className="space-y-5"
+        >
           <div className="space-y-2">
             <label htmlFor="password" className="block text-sm font-medium text-fg">
               Nueva contraseña
             </label>
             <input
               id="password"
+              ref={passwordControl}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? 'password-error' : undefined}
               type="password"
               autoComplete="new-password"
               required
@@ -169,7 +184,12 @@ export default function ResetPassword(): React.ReactElement {
             />
           </div>
           {errorMessage && (
-            <p role="status" aria-live="polite" className="text-sm text-muted">
+            <p
+              id={invalid ? 'password-error' : undefined}
+              role={status.kind === 'error' ? 'alert' : 'status'}
+              aria-live={status.kind === 'error' ? 'assertive' : 'polite'}
+              className={status.kind === 'error' ? 'text-sm text-danger' : 'text-sm text-muted'}
+            >
               {errorMessage}
             </p>
           )}

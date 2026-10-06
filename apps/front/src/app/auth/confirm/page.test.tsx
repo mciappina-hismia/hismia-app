@@ -46,7 +46,7 @@ describe('confirmation return', () => {
     first.unmount();
     window.history.replaceState(null, '', '/auth/confirm?error=access_denied');
     render(<Confirm />);
-    expect(await screen.findByText(/confirmation unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/confirmación no disponible/i);
     expect(exchangeCodeForSession).toHaveBeenCalledTimes(1);
   });
 
@@ -58,7 +58,7 @@ describe('confirmation return', () => {
       '/auth/confirm?error=access_denied&next=https://elsewhere.test#access_token=synthetic',
     );
     render(<Confirm />);
-    expect(await screen.findByText(/confirmation unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/confirmación no disponible/i);
     expect(replace).not.toHaveBeenCalled();
     expect(window.location.search).toBe('');
     expect(window.location.hash).toBe('');
@@ -92,7 +92,7 @@ describe('confirmation return', () => {
     browserAuth.mockReturnValue(null);
     window.history.replaceState(null, '', '/auth/confirm?code=one#synthetic');
     render(<Confirm />);
-    expect(await screen.findByText(/setup required/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/configuración requerida/i);
     expect(window.location.search).toBe('');
     expect(window.location.hash).toBe('');
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('confirmation return', () => {
     window.history.replaceState(null, '', '/auth/confirm?code=expired&returnTo=/unsafe');
     exchangeCodeForSession.mockResolvedValue({ error: new Error('expired') });
     render(<Confirm />);
-    expect(await screen.findByText(/confirmation unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/confirmación no disponible/i);
     expect(replace).not.toHaveBeenCalled();
     expect(window.location.search).toBe('');
   });

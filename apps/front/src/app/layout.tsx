@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Hismia',
-  description: 'Personal clinical history with revocable professional grants.',
+  description: 'Historia clínica personal con permisos profesionales revocables.',
 };
 
 interface RootLayoutProps {
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: RootLayoutProps): ReactElement 
     // comparison for these two nodes only; the rest of the tree still
     // hydrates strictly. The fix does not weaken the hydration check on
     // user content.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body suppressHydrationWarning>{children}</body>
     </html>
   );

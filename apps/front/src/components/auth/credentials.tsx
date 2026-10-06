@@ -28,6 +28,10 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<
+    Partial<Record<'email' | 'password' | 'accountType', string>>
+  >({});
+  const [failed, setFailed] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -36,21 +40,27 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
     const values = new FormData(form);
     const email = String(values.get('email') ?? '').trim();
     const accountType = String(values.get('accountType') ?? '');
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      password.length < 6 ||
-      (mode === 'signup' && !isAccountType(accountType))
-    ) {
-      setMessage('Check your email, password and account type.');
+    const invalid: typeof errors = {};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) invalid.email = 'Ingresa un email válido.';
+    if (password.length < 6) invalid.password = 'La contraseña debe tener al menos 6 caracteres.';
+    if (mode === 'signup' && !isAccountType(accountType))
+      invalid.accountType = 'Elige un tipo de cuenta.';
+    setErrors(invalid);
+    setFailed(true);
+    const first = Object.keys(invalid)[0];
+    if (first) {
+      setMessage('Revisa los campos indicados.');
+      form.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
       return;
     }
     const auth = browserAuth();
     if (!auth) {
-      setMessage('Setup required. Contact the site administrator.');
+      setMessage('Configuración requerida. Contacta al administrador del sitio.');
       return;
     }
     submitting.current = true;
     setBusy(true);
+    setFailed(false);
     setMessage('');
     let unexpectedSession = false;
     try {
@@ -66,26 +76,29 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
           // A session here means confirmation is not enforced by the provider.
           // Clear only this browser's session; do not revoke other devices.
           await auth.auth.signOut({ scope: 'local' });
-          setMessage('Registration unavailable. Contact the site administrator.');
+          setFailed(true);
+          setMessage('Registro no disponible. Contacta al administrador del sitio.');
         } else {
           if (!result.error && isAccountType(accountType)) rememberPreference(accountType);
-          setMessage('If this address can register, check your email for a confirmation link.');
+          setMessage('Si este email puede registrarse, recibirás un enlace de confirmación.');
         }
       } else {
         const result = await auth.auth.signInWithPassword({ email, password });
         if (result.error || !(await confirmedUser(auth))) {
-          setMessage('Sign-in unavailable. Check your details and confirm your email.');
+          setFailed(true);
+          setMessage('No se pudo iniciar sesión. Revisa tus datos y confirma tu email.');
         } else {
           router.replace(ONBOARDING_PATH);
         }
       }
     } catch {
+      setFailed(mode === 'login' || unexpectedSession);
       setMessage(
         mode === 'signup'
           ? unexpectedSession
-            ? 'Registration unavailable. Contact the site administrator.'
-            : 'If this address can register, check your email for a confirmation link.'
-          : 'Sign-in unavailable. Check your details and confirm your email.',
+            ? 'Registro no disponible. Contacta al administrador del sitio.'
+            : 'Si este email puede registrarse, recibirás un enlace de confirmación.'
+          : 'No se pudo iniciar sesión. Revisa tus datos y confirma tu email.',
       );
     } finally {
       setPassword('');
@@ -157,12 +170,19 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
               <input
                 id="email"
                 name="email"
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'email-error' : undefined}
                 type="email"
                 autoComplete="email"
                 required
                 disabled={busy}
                 className={fieldClassName}
               />
+              {errors.email && (
+                <p id="email-error" className="text-sm text-danger">
+                  {errors.email}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="block text-sm font-medium text-fg">
@@ -171,6 +191,8 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
               <input
                 id="password"
                 name="password"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? 'password-error' : undefined}
                 type="password"
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 required
@@ -180,6 +202,11 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
                 disabled={busy}
                 className={fieldClassName}
               />
+              {errors.password && (
+                <p id="password-error" className="text-sm text-danger">
+                  {errors.password}
+                </p>
+              )}
             </div>
             {mode === 'signup' && (
               <div className="space-y-2">
@@ -192,7 +219,10 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
                   defaultValue=""
                   required
                   disabled={busy}
-                  aria-describedby="account-type-help"
+                  aria-invalid={Boolean(errors.accountType)}
+                  aria-describedby={
+                    errors.accountType ? 'account-type-help accountType-error' : 'account-type-help'
+                  }
                   className={fieldClassName}
                 >
                   <option value="">Elegir tipo de cuenta</option>
@@ -202,6 +232,11 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
                     </option>
                   ))}
                 </select>
+                {errors.accountType && (
+                  <p id="accountType-error" className="text-sm text-danger">
+                    {errors.accountType}
+                  </p>
+                )}
                 <p id="account-type-help" className="text-sm leading-relaxed text-muted">
                   Esta es una preferencia de onboarding, no un permiso o rol verificado.
                 </p>
@@ -220,8 +255,19 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
             aria-live="polite"
             className="mt-4 min-h-6 text-sm leading-relaxed text-secondary-text"
           >
-            {message}
+            {busy
+              ? mode === 'signup'
+                ? 'Creando tu cuenta…'
+                : 'Iniciando sesión…'
+              : !failed
+                ? message
+                : ''}
           </p>
+          {failed && message && (
+            <p role="alert" className="mt-4 text-sm text-danger">
+              {message}
+            </p>
+          )}
           {mode === 'login' && (
             <a
               href={RECOVERY_PATH}

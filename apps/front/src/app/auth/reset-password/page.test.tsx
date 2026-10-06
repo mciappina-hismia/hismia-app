@@ -49,6 +49,17 @@ async function readyWithSession(): Promise<void> {
 }
 
 describe('reset password', () => {
+  it('announces password-update progress politely, without an error announcement', async () => {
+    updateUser.mockImplementation(() => new Promise(() => {}));
+    await readyWithSession();
+    fireEvent.input(screen.getByLabelText(/nueva contraseña/i), {
+      target: { value: 'new-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
+    expect(screen.getByRole('status')).toHaveTextContent('Actualizando tu contraseña…');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
   it('shows a pending state while checking the recovery session', async () => {
     window.history.replaceState(null, '', `${RESET_PASSWORD_PATH}?code=synthetic`);
     exchangeCodeForSession.mockImplementation(() => new Promise(() => {}));
@@ -85,6 +96,12 @@ describe('reset password', () => {
     fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
     expect(await screen.findByText(/la contraseña debe tener al menos/i)).toBeInTheDocument();
     expect(updateUser).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/nueva contraseña/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText(/nueva contraseña/i)).toHaveAccessibleDescription(
+      'La contraseña debe tener al menos 6 caracteres.',
+    );
+    expect(screen.getByLabelText(/nueva contraseña/i)).toHaveFocus();
+    expect(screen.getByRole('alert')).toHaveTextContent(/al menos 6 caracteres/);
   });
 
   it('calls updateUser, signs out the recovery session and redirects to /login', async () => {
@@ -109,7 +126,10 @@ describe('reset password', () => {
       target: { value: 'new-strong-password' },
     });
     fireEvent.click(screen.getByRole('button', { name: /actualizar contraseña/i }));
-    expect(await screen.findByText(/no se pudo actualizar la contraseña/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /no se pudo actualizar la contraseña/i,
+    );
+    expect(screen.getByLabelText(/nueva contraseña/i)).toHaveAttribute('aria-invalid', 'false');
     expect(replace).not.toHaveBeenCalled();
   });
 

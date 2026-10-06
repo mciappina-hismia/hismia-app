@@ -97,36 +97,37 @@ export default function Onboarding(): React.ReactElement {
       <div className="grid w-full max-w-2xl gap-6 rounded-3xl border border-border bg-card p-8 shadow-xl shadow-primary-soft/40 sm:p-12">
         <header className="space-y-3">
           <h1 className="text-4xl leading-tight font-semibold tracking-tight text-heading">
-            Onboarding
+            Completar perfil
           </h1>
           {state === 'ready' && (
             <p className="text-base leading-relaxed text-muted">
-              Choose your account type and complete your profile. A signup preference is not a role.
+              Elige tu tipo de cuenta y completa tu perfil. La preferencia de registro no concede un
+              rol.
             </p>
           )}
         </header>
         {state === 'checking' && (
           <p role="status" className="text-base leading-relaxed text-muted">
-            Checking your account…
+            Verificando tu cuenta…
           </p>
         )}
         {state === 'setup' && (
-          <p role="status" className="text-base leading-relaxed text-muted">
-            Setup required. Contact the site administrator.
+          <p role="alert" className="text-base leading-relaxed text-muted">
+            Configuración requerida. Contacta al administrador del sitio.
           </p>
         )}
         {state === 'login' && (
-          <p role="status" className="text-base leading-relaxed text-muted">
-            Confirm your email and{' '}
+          <p role="alert" className="text-base leading-relaxed text-muted">
+            Confirma tu email e{' '}
             <a href="/login" className="text-primary-strong underline">
-              sign in
+              inicia sesión
             </a>{' '}
-            to continue.
+            para continuar.
           </p>
         )}
         {state === 'unavailable' && (
-          <p role="status" className="text-base leading-relaxed text-muted">
-            Account verification unavailable. Please try again later.
+          <p role="alert" className="text-base leading-relaxed text-muted">
+            No se pudo verificar tu cuenta. Intenta nuevamente más tarde.
           </p>
         )}
         {state === 'ready' && (

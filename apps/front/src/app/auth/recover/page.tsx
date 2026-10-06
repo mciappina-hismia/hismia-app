@@ -11,17 +11,26 @@ export default function Recover(): React.ReactElement {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const submitting = useRef(false);
+  const emailControl = useRef<HTMLInputElement>(null);
+  const [invalid, setInvalid] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (submitting.current) return;
     const trimmed = email.trim();
+    setInvalid(false);
+    setFailed(false);
     if (!EMAIL_RE.test(trimmed)) {
+      setInvalid(true);
+      setFailed(true);
+      emailControl.current?.focus();
       setMessage('Revisa tu email.');
       return;
     }
     const auth = browserAuth();
     if (!auth) {
+      setFailed(true);
       setMessage('Configuración requerida. Contacta al administrador del sistema.');
       return;
     }
@@ -49,13 +58,16 @@ export default function Recover(): React.ReactElement {
             coincide.
           </p>
         </header>
-        <form onSubmit={submit} noValidate className="space-y-5">
+        <form onSubmit={submit} noValidate aria-busy={busy} className="space-y-5">
           <div className="space-y-2">
             <label htmlFor="email" className="block text-sm font-medium text-fg">
               Email
             </label>
             <input
               id="email"
+              ref={emailControl}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? 'email-error' : undefined}
               type="email"
               autoComplete="email"
               required
@@ -65,8 +77,15 @@ export default function Recover(): React.ReactElement {
               className="min-h-touch w-full rounded-xl border border-input-border bg-input px-4 py-3 text-base text-fg transition-colors focus:border-primary-strong disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
-          {message && (
-            <p role="status" aria-live="polite" className="text-sm text-muted">
+          <p role="status" aria-live="polite" className="text-sm text-muted">
+            {busy ? 'Enviando el enlace de recuperación…' : !failed ? message : ''}
+          </p>
+          {failed && message && (
+            <p
+              id={invalid ? 'email-error' : undefined}
+              role="alert"
+              className="text-sm text-danger"
+            >
               {message}
             </p>
           )}
@@ -79,7 +98,7 @@ export default function Recover(): React.ReactElement {
           </button>
         </form>
         <p className="text-sm leading-relaxed text-muted">
-          Recuerdas tu contraseña?{' '}
+          ¿Recuerdas tu contraseña?{' '}
           <a href="/login" className="text-primary-strong underline">
             Iniciar sesión
           </a>

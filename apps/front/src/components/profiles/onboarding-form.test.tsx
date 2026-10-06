@@ -26,22 +26,71 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 function submit() {
-  fireEvent.click(screen.getByRole('button', { name: /save profile/i }));
+  fireEvent.click(screen.getByRole('button', { name: /guardar perfil/i }));
 }
 function fillProfessional() {
-  fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Doctor Test' } });
-  fireEvent.change(screen.getByLabelText('Specialty'), { target: { value: 'General' } });
-  fireEvent.change(screen.getByLabelText('Practice locality'), { target: { value: 'City' } });
+  fireEvent.change(screen.getByLabelText('Nombre visible'), { target: { value: 'Doctor Test' } });
+  fireEvent.change(screen.getByLabelText('Especialidad'), { target: { value: 'General' } });
+  fireEvent.change(screen.getByLabelText('Localidad de ejercicio'), { target: { value: 'City' } });
 }
 
 describe('create-only profile form', () => {
+  it.each([
+    ['patient', ['Nombre visible', 'Fecha de nacimiento', 'Localidad de residencia']],
+    ['professional', ['Nombre visible', 'Especialidad', 'Localidad de ejercicio']],
+    ['institution', ['Nombre de la institución', 'Tipo de institución', 'Ubicación']],
+  ] as const)('describes every invalid %s field and focuses the first', async (type, labels) => {
+    render(
+      <OnboardingForm authorize={authorize} initialType={type} now={today} onSignin={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar perfil' }));
+    await waitFor(() => expect(screen.getByLabelText(labels[0])).toHaveFocus());
+    for (const label of labels) {
+      const control = screen.getByLabelText(label);
+      expect(control).toHaveAttribute('aria-invalid', 'true');
+      expect(control).toHaveAccessibleDescription();
+      const description = document.getElementById(control.getAttribute('aria-describedby')!);
+      expect(description).toHaveTextContent(/Ingresa/);
+    }
+    expect(screen.getByRole('alert')).toHaveTextContent('Revisa los campos indicados.');
+    expect(authorize).not.toHaveBeenCalled();
+  });
+  it('announces saving politely and clears validation descriptions after correction', async () => {
+    createProfile.mockImplementation(() => new Promise(() => {}));
+    render(
+      <OnboardingForm
+        authorize={authorize}
+        initialType="professional"
+        now={today}
+        onSignin={vi.fn()}
+      />,
+    );
+    submit();
+    await waitFor(() =>
+      expect(screen.getByLabelText('Nombre visible')).toHaveAttribute('aria-invalid', 'true'),
+    );
+    fillProfessional();
+    submit();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Guardando tu perfil…'),
+    );
+    expect(screen.getByLabelText('Nombre visible')).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.getByLabelText('Nombre visible')).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
   it('validates March 1 leap boundary, omits absent gender and sends selected gender', async () => {
     render(
       <OnboardingForm authorize={authorize} initialType="patient" now={today} onSignin={vi.fn()} />,
     );
-    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Patient Test' } });
-    fireEvent.change(screen.getByLabelText('Birth date'), { target: { value: '2008-02-29' } });
-    fireEvent.change(screen.getByLabelText('Residence locality'), { target: { value: 'City' } });
+    fireEvent.change(screen.getByLabelText('Nombre visible'), {
+      target: { value: 'Patient Test' },
+    });
+    fireEvent.change(screen.getByLabelText('Fecha de nacimiento'), {
+      target: { value: '2008-02-29' },
+    });
+    fireEvent.change(screen.getByLabelText('Localidad de residencia'), {
+      target: { value: 'City' },
+    });
     submit();
     await waitFor(() =>
       expect(createProfile).toHaveBeenCalledWith(
@@ -55,15 +104,22 @@ describe('create-only profile form', () => {
         '2026-03-01',
       ),
     );
-    expect(screen.getByRole('status')).toHaveTextContent(/profile saved or already existed/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/perfil guardado o ya existente/i);
+    expect(screen.getByRole('status')).toHaveClass('text-secondary-text');
     cleanup();
     render(
       <OnboardingForm authorize={authorize} initialType="patient" now={today} onSignin={vi.fn()} />,
     );
-    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Patient Test' } });
-    fireEvent.change(screen.getByLabelText('Birth date'), { target: { value: '2008-02-29' } });
-    fireEvent.change(screen.getByLabelText('Residence locality'), { target: { value: 'City' } });
-    fireEvent.change(screen.getByLabelText('Gender (optional)'), {
+    fireEvent.change(screen.getByLabelText('Nombre visible'), {
+      target: { value: 'Patient Test' },
+    });
+    fireEvent.change(screen.getByLabelText('Fecha de nacimiento'), {
+      target: { value: '2008-02-29' },
+    });
+    fireEvent.change(screen.getByLabelText('Localidad de residencia'), {
+      target: { value: 'City' },
+    });
+    fireEvent.change(screen.getByLabelText('Género (opcional)'), {
       target: { value: 'no binario' },
     });
     submit();
@@ -91,12 +147,12 @@ describe('create-only profile form', () => {
       />,
     );
     fillProfessional();
-    fireEvent.change(screen.getByLabelText('Account type'), { target: { value: 'institution' } });
-    fireEvent.change(screen.getByLabelText('Institution name'), {
+    fireEvent.change(screen.getByLabelText('Tipo de cuenta'), { target: { value: 'institution' } });
+    fireEvent.change(screen.getByLabelText('Nombre de la institución'), {
       target: { value: 'Test Center' },
     });
-    fireEvent.change(screen.getByLabelText('Institution type'), { target: { value: 'Clinic' } });
-    fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'City' } });
+    fireEvent.change(screen.getByLabelText('Tipo de institución'), { target: { value: 'Clinic' } });
+    fireEvent.change(screen.getByLabelText('Ubicación'), { target: { value: 'City' } });
     submit();
     await waitFor(() =>
       expect(createProfile).toHaveBeenCalledWith(
@@ -115,14 +171,20 @@ describe('create-only profile form', () => {
         onSignin={vi.fn()}
       />,
     );
-    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'Patient Test' } });
-    fireEvent.change(screen.getByLabelText('Birth date'), { target: { value: '2008-02-29' } });
-    fireEvent.change(screen.getByLabelText('Residence locality'), { target: { value: 'City' } });
+    fireEvent.change(screen.getByLabelText('Nombre visible'), {
+      target: { value: 'Patient Test' },
+    });
+    fireEvent.change(screen.getByLabelText('Fecha de nacimiento'), {
+      target: { value: '2008-02-29' },
+    });
+    fireEvent.change(screen.getByLabelText('Localidad de residencia'), {
+      target: { value: 'City' },
+    });
     submit();
-    await screen.findByText(/adult/i);
+    await screen.findByText(/al menos 18 años/i);
     expect(authorize).not.toHaveBeenCalled();
     expect(createProfile).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Display name')).toHaveValue('Patient Test');
+    expect(screen.getByLabelText('Nombre visible')).toHaveValue('Patient Test');
   });
   it('uses the current UTC day after async identity refresh at midnight', async () => {
     let current = new Date('2026-02-28T23:59:59Z');
@@ -181,11 +243,11 @@ describe('create-only profile form', () => {
     );
     fillProfessional();
     submit();
-    fireEvent.submit(screen.getByRole('button', { name: /save profile/i }).closest('form')!);
+    fireEvent.submit(screen.getByRole('button', { name: /guardar perfil/i }).closest('form')!);
     await waitFor(() => expect(createProfile).toHaveBeenCalledOnce());
     expect(authorize).toHaveBeenCalledOnce();
-    expect(await screen.findByRole('alert')).toHaveTextContent(/unavailable/i);
-    expect(screen.getByLabelText('Display name')).toHaveValue('Doctor Test');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no está disponible/i);
+    expect(screen.getByLabelText('Nombre visible')).toHaveValue('Doctor Test');
   });
   it('ignores an already-sent save result after account invalidation', async () => {
     let current = true;
@@ -205,7 +267,7 @@ describe('create-only profile form', () => {
     fillProfessional();
     submit();
     await waitFor(() => expect(createProfile).toHaveBeenCalledOnce());
-    expect(screen.queryByText(/profile saved or already existed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/perfil guardado o ya existente/i)).not.toBeInTheDocument();
   });
   it('shows safe conflict and sign-in messages without retrying automatically', async () => {
     const onSignin = vi.fn();
@@ -220,7 +282,7 @@ describe('create-only profile form', () => {
     );
     fillProfessional();
     submit();
-    expect(await screen.findByRole('alert')).toHaveTextContent(/different account type/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/tipo de cuenta diferente/i);
     createProfile.mockResolvedValueOnce({ kind: 'signin' });
     submit();
     await waitFor(() => expect(onSignin).toHaveBeenCalledOnce());
