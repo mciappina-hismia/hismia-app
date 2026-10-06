@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Onboarding from './page';
+import type * as ProfileClient from '../../lib/profiles/client';
 
 const { browserAuth, confirmedUser, verifyAccount, getSession, getUser, onAuthStateChange } =
   vi.hoisted(() => ({
@@ -12,7 +13,14 @@ const { browserAuth, confirmedUser, verifyAccount, getSession, getUser, onAuthSt
     onAuthStateChange: vi.fn(),
   }));
 vi.mock('../../lib/auth/browser', () => ({ browserAuth, confirmedUser }));
-vi.mock('../../lib/profiles/client', () => ({ verifyAccount }));
+vi.mock('../../lib/profiles/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof ProfileClient>();
+  return {
+    ...actual,
+    checkedAccount: (auth: Parameters<typeof actual.checkedAccount>[0]) =>
+      actual.checkedAccount(auth, verifyAccount),
+  };
+});
 vi.mock('../../components/profiles/onboarding-form', () => ({
   OnboardingForm: ({
     initialType,
