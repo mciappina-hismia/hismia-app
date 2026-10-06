@@ -61,6 +61,18 @@ Se utilizan las siguientes paletas en orden para series de datos:
 
 - Logo: `#09396a` (His) y `#32c0b4` (Me)
 - Estos valores se repiten en textos del home y otros elementos de marca.
+- Propuesta autorizada para autenticación: el wordmark HisMia de signup/login es
+  una imagen de marca genuina, no un párrafo ni texto funcional. Se representa con
+  un `<img>` con `alt="Hismia"`, fuente local `/brand/hismia-wordmark.svg` y
+  dimensiones reservadas 144×44. El SVG externo contiene el literal actual His+mia,
+  fills `#09396a`/`#32c0b4`, fondo transparente y tipografía bold de 30 px con el
+  fallback existente (`Plus Jakarta Sans`, ui-sans-serif, system-ui, sans-serif).
+  El viewBox reserva márgenes para evitar recortar glifos. No descarga fuentes ni
+  promete identidad píxel a píxel con texto DOM o con el PNG oficial, que no se
+  modifica. No cambia la marca móvil ni se oculta de tecnologías de asistencia. La excepción de contraste para logotipos aplica
+  sólo al wordmark; títulos, instrucciones, enlaces y controles siguen sujetos a
+  sus requisitos de contraste. No se extiende `role="img"` a texto funcional ni
+  se deshabilitan reglas de axe; la aceptación en navegador sigue pendiente.
 
 ## Paletas alternativas (Accesibilidad → Tema de color)
 
@@ -227,15 +239,15 @@ Pasos a seguir cuando se llegue a ese punto:
 
 > Estos pares **no pasan AA** con la paleta actual. Un ícono + texto evita depender sólo del color (SC 1.4.1), pero **no corrige contraste insuficiente** (SC 1.4.3). Para texto normal se exige al menos 4.5:1; para íconos informativos se verifica por separado SC 1.4.11. En autenticación y onboarding light se reutiliza texto secundario fuerte `#12403c` para éxito sobre tarjeta blanca (más de 10:1), y primario fuerte `#00615a` para botones con texto `#fafffd` (más de 7:1). El indicador de éxito `#31a773` conserva su valor, pero no se usa para texto normal sobre blanco. Estas verificaciones de pares no certifican toda la UI; teclado, lector de pantalla y navegador requieren evidencia adicional.
 
-| #   | Par                                                                           | Ratio  | AA  | AAA | Tratamiento propuesto                                                                                                                                                                          |
-| --- | ----------------------------------------------------------------------------- | ------ | --- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| G1  | Primario turquesa `#1e8d80` sobre fondo general                               | 4.00:1 | ❌  | ❌  | Solo UI decorativo (botón con texto blanco encima, no como color de texto sobre fondo). El texto sobre primario usa `#fafffd` (4.02:1 large → AA ✅). Restricción a documentar en Guía de uso. |
-| G2  | Éxito `#31a773` sobre blanco                                                  | 3.04:1 | ❌  | ❌  | Texto de éxito en `#12403c` sobre blanco; reservar `#31a773` para indicadores con contraste no textual verificado. Ícono + texto no exime SC 1.4.3.                                            |
-| G3  | Advertencia `#e8ab3e` sobre blanco                                            | 2.03:1 | ❌  | ❌  | Texto en un tono fuerte con >=4.5:1 sobre su fondo; ícono + texto no corrige el contraste de este par.                                                                                         |
-| G4  | Emergencia `#cf3f4c` sobre fondo suave `#ffedeb`                              | 4.15:1 | ❌  | ❌  | Usar texto blanco sobre emergencia sólido (4.70:1 AA ✅) en lugar del fondo suave `#ffedeb`. Documentar restricción.                                                                           |
-| G5  | Rosa embarazo `#ea808f` sobre blanco                                          | 2.63:1 | ❌  | ❌  | No usar como texto normal; acompañar con texto fuerte y verificar por separado los indicadores informativos.                                                                                   |
-| G6  | Logo Me `#32c0b4` sobre blanco                                                | 2.25:1 | ❌  | ❌  | Logo decorativo: WCAG exime logos que no transmiten información funcional. Solo se usa en marca (home), no como UI element informativo.                                                        |
-| G7  | Paletas alternativas Celeste (3.07:1) y Violeta (4.22:1) sobre su fondo suave | —      | ❌  | ❌  | Solo como tono fuerte de badge/UI, no como color de texto. Documentar restricción.                                                                                                             |
+| #   | Par                                                                           | Ratio  | AA  | AAA | Tratamiento propuesto                                                                                                                                                                                                                        |
+| --- | ----------------------------------------------------------------------------- | ------ | --- | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | Primario turquesa `#1e8d80` sobre fondo general                               | 4.00:1 | ❌  | ❌  | Solo UI decorativo (botón con texto blanco encima, no como color de texto sobre fondo). El texto sobre primario usa `#fafffd` (4.02:1 large → AA ✅). Restricción a documentar en Guía de uso.                                               |
+| G2  | Éxito `#31a773` sobre blanco                                                  | 3.04:1 | ❌  | ❌  | Texto de éxito en `#12403c` sobre blanco; reservar `#31a773` para indicadores con contraste no textual verificado. Ícono + texto no exime SC 1.4.3.                                                                                          |
+| G3  | Advertencia `#e8ab3e` sobre blanco                                            | 2.03:1 | ❌  | ❌  | Texto en un tono fuerte con >=4.5:1 sobre su fondo; ícono + texto no corrige el contraste de este par.                                                                                                                                       |
+| G4  | Emergencia `#cf3f4c` sobre fondo suave `#ffedeb`                              | 4.15:1 | ❌  | ❌  | Usar texto blanco sobre emergencia sólido (4.70:1 AA ✅) en lugar del fondo suave `#ffedeb`. Documentar restricción.                                                                                                                         |
+| G5  | Rosa embarazo `#ea808f` sobre blanco                                          | 2.63:1 | ❌  | ❌  | No usar como texto normal; acompañar con texto fuerte y verificar por separado los indicadores informativos.                                                                                                                                 |
+| G6  | Logo Me `#32c0b4` sobre blanco                                                | 2.25:1 | ❌  | ❌  | Logotipo genuino en home y wordmark de autenticación como `<img alt="Hismia">` con SVG local; excepción de contraste sólo para la imagen de marca, nunca para texto funcional ni controles. No ocultar la marca a tecnologías de asistencia. |
+| G7  | Paletas alternativas Celeste (3.07:1) y Violeta (4.22:1) sobre su fondo suave | —      | ❌  | ❌  | Solo como tono fuerte de badge/UI, no como color de texto. Documentar restricción.                                                                                                                                                           |
 
 ### Veredicto global light (V1)
 
