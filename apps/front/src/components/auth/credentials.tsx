@@ -2,7 +2,13 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { browserAuth, confirmedUser, CONFIRM_PATH, ONBOARDING_PATH } from '../../lib/auth/browser';
+import {
+  browserAuth,
+  confirmedUser,
+  CONFIRM_PATH,
+  ONBOARDING_PATH,
+  RECOVERY_PATH,
+} from '../../lib/auth/browser';
 import { ACCOUNT_TYPES, isAccountType, rememberPreference } from '../../lib/auth/preference';
 
 type Mode = 'signup' | 'login';
@@ -121,7 +127,10 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
           </p>
         </aside>
 
-        <section className="min-w-0 px-6 py-8 sm:px-10 sm:py-12 lg:px-12" aria-labelledby="auth-title">
+        <section
+          className="min-w-0 px-6 py-8 sm:px-10 sm:py-12 lg:px-12"
+          aria-labelledby="auth-title"
+        >
           <p className="mb-10 text-2xl font-bold tracking-tight text-brand-his lg:hidden">Hismia</p>
           <header className="mb-8">
             <p className="mb-3 text-xs font-semibold tracking-widest text-primary-strong uppercase">
@@ -213,6 +222,14 @@ export function Credentials({ mode }: { mode: Mode }): React.ReactElement {
           >
             {message}
           </p>
+          {mode === 'login' && (
+            <a
+              href={RECOVERY_PATH}
+              className="inline-flex min-h-touch items-center text-primary-strong underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </a>
+          )}
           <p className="mt-6 border-t border-border pt-6 text-center text-sm text-muted">
             {mode === 'signup' ? '¿Ya tienes una cuenta?' : '¿Nuevo en Hismia?'}{' '}
             <a

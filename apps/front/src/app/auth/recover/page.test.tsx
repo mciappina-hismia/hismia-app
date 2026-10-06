@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Recover from './page';
+import type * as Browser from '../../../lib/auth/browser';
+import { RESET_PASSWORD_PATH } from '../../../lib/auth/browser';
 
 const { resetPasswordForEmail, browserAuth } = vi.hoisted(() => ({
   resetPasswordForEmail: vi.fn(),
   browserAuth: vi.fn(),
 }));
 
-vi.mock('../../../lib/auth/browser', () => ({
+vi.mock('../../../lib/auth/browser', async (importOriginal) => ({
+  ...(await importOriginal<typeof Browser>()),
   browserAuth,
-  RECOVERY_PATH: '/auth/reset-password',
 }));
 
 beforeEach(() => {
@@ -40,10 +42,9 @@ describe('recover password', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /enviar enlace/i }));
     await waitFor(() =>
-      expect(resetPasswordForEmail).toHaveBeenCalledWith(
-        'user@example.test',
-        expect.objectContaining({ redirectTo: expect.stringContaining('/auth/reset-password') }),
-      ),
+      expect(resetPasswordForEmail).toHaveBeenCalledWith('user@example.test', {
+        redirectTo: `${window.location.origin}${RESET_PASSWORD_PATH}`,
+      }),
     );
   });
 

@@ -84,14 +84,14 @@ El flujo de recuperación sigue el mismo patrón que la confirmación de signup:
 ### Pasos del flow
 
 1. **Trigger**: el usuario hace click en "Forgot password?" en `/login` (cuando se implemente) o navega directamente a `/auth/recover`.
-2. **Submit email** (`/auth/recover`): el front llama `supabase.auth.resetPasswordForEmail(email, { redirectTo })`. Supabase manda un email con un link a `{redirectTo}?type=recovery&access_token=...&refresh_token=...`. El redirectTo configurado es `${window.location.origin}/auth/reset-password`. Independientemente de si el email existe o no en `auth.users`, la UI muestra un mensaje neutro ("Si este email puede resetearse, vas a recibir un link") para no permitir enumerar cuentas.
-3. **Click en el link**: el usuario abre el link. El SDK de Supabase parsea los tokens del URL fragment y establece una sesión de recovery.
-4. **Set new password** (`/auth/reset-password`): el front lee la sesión de recovery vía `browserAuth().auth.getSession()` o `detectSessionInUrl()`. Si hay sesión, renderiza un form con un campo `password` (mínimo 6 caracteres, validado con `zod` o un resolver equivalente). El submit llama `supabase.auth.updateUser({ password })`. Si la respuesta es exitosa, redirige a `/onboarding` o `/` según el estado del usuario.
-5. **Logout implícito**: Supabase invalida la sesión de recovery cuando se completa el update. El usuario tiene que re-loguearse con la nueva password.
+2. **Submit email** (`/auth/recover`): el front llama `supabase.auth.resetPasswordForEmail(email, { redirectTo })` con destino `${window.location.origin}/auth/reset-password`, distinto de la página de solicitud. La UI mantiene mensajería neutra incluso ante rechazo del proveedor.
+3. **Callback PKCE explícito**: con `detectSessionInUrl: false`, la aplicación captura `code` y el identificador de flujo `sb_flow_id`, limpia query/fragment antes de esperar y llama `exchangeCodeForSession` una sola vez por visita montada, incluso bajo StrictMode. El SDK instalado conserva el verifier local; otro navegador o almacenamiento perdido exige solicitar otro enlace desde ese navegador. No se habilita el append experimental de `sb_flow_id` (puede romper allowlists exactas); sin ese parámetro el SDK usa el último verifier, por lo que iniciar otra recuperación/confirmación puede reemplazarlo. Si el callback sí trae un identificador, se pasa explícitamente al SDK antes de limpiar la URL. Se rechazan errores del proveedor y fragments de flujos implícitos; no se usan parámetros de retorno como navegación.
+4. **Set new password** (`/auth/reset-password`): sólo se muestra el formulario tras un intercambio exitoso con sesión y `redirectType === 'recovery'`. El SDK deriva ese tipo del verifier local marcado para recovery y emite `PASSWORD_RECOVERY`; no es una nueva garantía de autorización del servidor. Una sesión persistida ordinaria o `type=recovery` en URL no basta para admitir la UI. Antes de `updateUser({ password })`, se comprueba que la sesión actual corresponde al sujeto del intercambio; mínimo 6 caracteres, como en los formularios de credenciales existentes. Supabase sigue validando la operación real.
+5. **Logout explícito**: actualizar la contraseña no implica cerrar automáticamente esta sesión. Después de actualizar, se llama `signOut({ scope: 'local' })` y sólo tras éxito se navega a `/login`. Si falla el cierre, la UI informa que la contraseña ya cambió, sin reenviar el update ni afirmar logout global. Recargar la página limpia requiere un nuevo enlace; no se persiste una marca adicional de recovery.
 
 ### Authorization
 
-- Las dos rutas de recovery (`/auth/recover` y `/auth/reset-password`) son **públicas** en el sentido HTTP: no requieren JWT preexistente. La autorización está implícita en el token de recovery que Supabase genera y envía por email.
+- Las dos rutas de recovery (`/auth/recover` y `/auth/reset-password`) son **públicas** en el sentido HTTP: no requieren JWT preexistente. Supabase valida código/verifier y la sesión usada para actualizar la contraseña; los controles de procedencia en UI no conceden permisos clínicos ni sustituyen autorización de servidor.
 - El backend **no tiene endpoints de recovery**. La separación es deliberada: si el usuario olvidó la password, no puede autenticarse contra el backend para resetearla; el reset es end-to-end via Supabase. Esto evita un ciclo de "necesito estar autenticado para recuperar mi autenticación".
 
 ### Rate limiting
@@ -104,7 +104,7 @@ El form de `/auth/recover` siempre muestra "Si este email puede resetearse, vas 
 
 ### Tests
 
-- **Front**: `apps/front/src/app/auth/recover/page.test.tsx` y `apps/front/src/app/auth/reset-password/page.test.tsx`. Cubren el caso happy path y los casos de error (email inválido, sesión de recovery ausente, password muy corta, error de Supabase).
+- **Front**: tests de ambas páginas y `apps/front/src/lib/auth/recovery.test.ts` cubren coordinación, rutas, StrictMode y fallos. `recovery.contract.test.ts` usa el cliente SDK real, almacenamiento sintético y HTTP deny-by-default para verificar verifier, intercambio, procedencia, actualización y cierre local. No acredita entrega real de email ni allowlists del proveedor.
 - **Backend**: ninguno (no hay endpoints de recovery en el backend).
 
 ### Out of scope (V1)
