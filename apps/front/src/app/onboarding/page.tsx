@@ -4,24 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { browserAuth } from '../../lib/auth/browser';
 import { readPreference, type AccountType } from '../../lib/auth/preference';
-import { verifyAccount } from '../../lib/profiles/client';
+import { checkedAccount } from '../../lib/profiles/client';
+import { exceptionFailure } from '../../lib/profiles/errors';
 import { OnboardingForm, type SubmitAccess } from '../../components/profiles/onboarding-form';
-
-async function checkedAccount(
-  auth: SupabaseClient,
-): Promise<{ kind: 'ready'; subject: string; token: string } | { kind: 'signin' | 'unavailable' }> {
-  const { data: userData, error: userError } = await auth.auth.getUser();
-  const user = userData.user;
-  if (userError || !user?.id || !user.email_confirmed_at) return { kind: 'signin' };
-  const { data: sessionData, error: sessionError } = await auth.auth.getSession();
-  const session = sessionData.session;
-  if (sessionError || !session?.access_token || session.user?.id !== user.id)
-    return { kind: 'signin' };
-  const gate = await verifyAccount(session.access_token);
-  if (gate.kind !== 'ready') return gate;
-  if (gate.subject !== user.id) return { kind: 'signin' };
-  return { kind: 'ready', subject: user.id, token: session.access_token };
-}
 
 export default function Onboarding(): React.ReactElement {
   const [state, setState] = useState<'checking' | 'ready' | 'login' | 'setup' | 'unavailable'>(
@@ -55,7 +40,7 @@ export default function Onboarding(): React.ReactElement {
       setState('login');
     });
     const initial = generation.current;
-    void checkedAccount(auth)
+    void checkedAccount(auth.auth)
       .then((result) => {
         if (!active || initial !== generation.current) return;
         if (result.kind === 'ready') {
@@ -82,14 +67,14 @@ export default function Onboarding(): React.ReactElement {
     const version = generation.current;
     if (!auth || !expected) return { kind: 'signin' };
     try {
-      const result = await checkedAccount(auth);
+      const result = await checkedAccount(auth.auth);
       if (version !== generation.current || identity.current !== expected)
         return { kind: 'signin' };
       if (result.kind !== 'ready') return result;
       if (result.subject !== expected) return { kind: 'signin' };
       return { kind: 'ready', token: result.token };
-    } catch {
-      return { kind: 'unavailable' };
+    } catch (error) {
+      return exceptionFailure(error, 'transport');
     }
   };
   return (

@@ -1,16 +1,40 @@
 import { accountProfileSchema } from '@hismia/validation';
 import type { AccountProfileInput, PersistedProfile } from '@hismia/types';
+import {
+  authenticationFailure,
+  exceptionFailure,
+  httpFailure,
+  type ProfileFailure,
+} from './errors';
 
-export type GateResult = { kind: 'ready'; subject: string } | { kind: 'signin' | 'unavailable' };
-export type SaveResult =
-  | { kind: 'saved'; profile: PersistedProfile }
-  | { kind: 'invalid' | 'signin' | 'conflict' | 'unavailable' };
+export type GateResult =
+  { kind: 'ready'; subject: string } | Extract<ProfileFailure, { kind: 'signin' | 'unavailable' }>;
+export type SaveResult = { kind: 'saved'; profile: PersistedProfile } | ProfileFailure;
 
-function failure(status: number): Exclude<SaveResult, { kind: 'saved' }> {
-  if (status === 401 || status === 403) return { kind: 'signin' };
-  if (status === 400) return { kind: 'invalid' };
-  if (status === 409) return { kind: 'conflict' };
-  return { kind: 'unavailable' };
+function gateFailure(failure: ProfileFailure): Exclude<GateResult, { kind: 'ready' }> {
+  return failure.kind === 'signin' ? failure : { kind: 'unavailable', error: failure.error };
+}
+
+const contractFailure = { kind: 'unavailable', error: { category: 'contract' } } as const;
+
+// Keep fetch rejection and JSON decoding separate; neither exposes raw provider data.
+async function request(
+  url: string,
+  options: RequestInit,
+): Promise<{ kind: 'response'; body: unknown } | ProfileFailure> {
+  let response: Response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    return exceptionFailure(error, 'transport');
+  }
+  if (!response.ok) return httpFailure(response.status);
+  try {
+    const body: unknown = await response.json();
+    return { kind: 'response', body };
+  } catch (error) {
+    return exceptionFailure(error, 'decoding');
+  }
 }
 
 function timestamp(value: unknown): value is string {
@@ -26,29 +50,64 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 
 export async function verifyAccount(token: string): Promise<GateResult> {
-  if (!token) return { kind: 'signin' };
+  if (!token) return authenticationFailure();
+  const response = await request('/api/hismia/auth/me', {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (response.kind !== 'response') return gateFailure(response);
+  const body = response.body;
+  if (
+    !object(body) ||
+    typeof body.sub !== 'string' ||
+    !body.sub ||
+    typeof body.email !== 'string' ||
+    !body.email ||
+    body.role !== 'authenticated'
+  )
+    return contractFailure;
+  return { kind: 'ready', subject: body.sub };
+}
+
+// Small identity port: the installed SDK satisfies it, tests need no provider session.
+type AccountAuth = {
+  getUser: () => Promise<{
+    data: { user: { id: string; email_confirmed_at?: string } | null };
+    error: unknown;
+  }>;
+  getSession: () => Promise<{
+    data: { session: { access_token: string; user: { id: string } } | null };
+    error: unknown;
+  }>;
+};
+export type CheckedAccount =
+  { kind: 'ready'; subject: string; token: string } | Exclude<GateResult, { kind: 'ready' }>;
+
+function providerFailure(error: unknown): Exclude<GateResult, { kind: 'ready' }> {
+  if (object(error) && typeof error.status === 'number')
+    return gateFailure(httpFailure(error.status));
+  return exceptionFailure(error, 'transport');
+}
+
+export async function checkedAccount(
+  auth: AccountAuth,
+  verify: (token: string) => Promise<GateResult> = verifyAccount,
+): Promise<CheckedAccount> {
   try {
-    const response = await fetch('/api/hismia/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!response.ok)
-      return response.status === 401 || response.status === 403
-        ? { kind: 'signin' }
-        : { kind: 'unavailable' };
-    const body: unknown = await response.json();
-    if (
-      !object(body) ||
-      typeof body.sub !== 'string' ||
-      !body.sub ||
-      typeof body.email !== 'string' ||
-      !body.email ||
-      body.role !== 'authenticated'
-    )
-      return { kind: 'unavailable' };
-    return { kind: 'ready', subject: body.sub };
-  } catch {
-    return { kind: 'unavailable' };
+    const { data: userData, error: userError } = await auth.getUser();
+    if (userError) return providerFailure(userError);
+    const user = userData.user;
+    if (!user?.id || !user.email_confirmed_at) return authenticationFailure();
+    const { data: sessionData, error: sessionError } = await auth.getSession();
+    if (sessionError) return providerFailure(sessionError);
+    const session = sessionData.session;
+    if (!session?.access_token || session.user?.id !== user.id) return authenticationFailure();
+    const gate = await verify(session.access_token);
+    if (gate.kind !== 'ready') return gate;
+    if (gate.subject !== user.id) return authenticationFailure();
+    return { kind: 'ready', subject: user.id, token: session.access_token };
+  } catch (error) {
+    return providerFailure(error);
   }
 }
 
@@ -57,13 +116,13 @@ export async function createProfile(
   input: AccountProfileInput,
   asOf: string,
 ): Promise<SaveResult> {
-  if (!token) return { kind: 'signin' };
+  if (!token) return authenticationFailure();
   const parsed = accountProfileSchema(asOf).safeParse(input);
   if (
     !parsed.success ||
     (parsed.data.accountType === 'patient' && parsed.data.birthDate.length !== 10)
   )
-    return { kind: 'invalid' };
+    return { kind: 'invalid', error: { category: 'validation' } };
   // Parse into an allowlisted wire object: never forward a subject or privileged client fields.
   const data = parsed.data;
   const payload: AccountProfileInput =
@@ -76,36 +135,32 @@ export async function createProfile(
           ...(data.gender === undefined ? {} : { gender: data.gender }),
         }
       : data;
-  try {
-    const response = await fetch('/api/hismia/profiles/onboarding', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) return failure(response.status);
-    const body: unknown = await response.json();
-    if (!object(body) || !timestamp(body.createdAt) || !timestamp(body.updatedAt))
-      return { kind: 'unavailable' };
-    // The timestamps are server-generated; verify the remainder against the shared contract.
-    const { createdAt, updatedAt, ...fields } = body;
-    const persisted = accountProfileSchema(asOf).safeParse(fields);
-    if (!persisted.success || persisted.data.accountType !== payload.accountType)
-      return { kind: 'unavailable' };
-    const clean = persisted.data;
-    const result: PersistedProfile =
-      clean.accountType === 'patient'
-        ? {
-            accountType: 'patient',
-            displayName: clean.displayName,
-            birthDate: clean.birthDate,
-            residenceLocality: clean.residenceLocality,
-            ...(clean.gender === undefined ? {} : { gender: clean.gender }),
-            createdAt,
-            updatedAt,
-          }
-        : { ...clean, createdAt, updatedAt };
-    return { kind: 'saved', profile: result };
-  } catch {
-    return { kind: 'unavailable' };
-  }
+  const response = await request('/api/hismia/profiles/onboarding', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (response.kind !== 'response') return response;
+  const body = response.body;
+  if (!object(body) || !timestamp(body.createdAt) || !timestamp(body.updatedAt))
+    return contractFailure;
+  // The timestamps are server-generated; verify the remainder against the shared contract.
+  const { createdAt, updatedAt, ...fields } = body;
+  const persisted = accountProfileSchema(asOf).safeParse(fields);
+  if (!persisted.success || persisted.data.accountType !== payload.accountType)
+    return contractFailure;
+  const clean = persisted.data;
+  const result: PersistedProfile =
+    clean.accountType === 'patient'
+      ? {
+          accountType: 'patient',
+          displayName: clean.displayName,
+          birthDate: clean.birthDate,
+          residenceLocality: clean.residenceLocality,
+          ...(clean.gender === undefined ? {} : { gender: clean.gender }),
+          createdAt,
+          updatedAt,
+        }
+      : { ...clean, createdAt, updatedAt };
+  return { kind: 'saved', profile: result };
 }
