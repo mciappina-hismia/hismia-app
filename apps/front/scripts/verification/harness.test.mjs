@@ -90,6 +90,29 @@ test('snapshot is an explicit public allowlist with recursive exclusions', async
   await assert.rejects(access(path.join(scratch.root, '.git')));
 });
 
+test('snapshot excludes .meta/meta recursively before inspecting metadata symlinks', async () => {
+  const { source } = await fixture();
+  const excluded = [];
+  for (const area of [
+    'apps/front/src',
+    'apps/front/public',
+    'packages/types/src',
+    'packages/validation/src',
+  ]) {
+    for (const name of ['.meta', 'meta']) {
+      const relative = `${area}/nested/${name}/synthetic.json`;
+      excluded.push(relative);
+      await put(source, relative, '{"syntheticMetadata":true}');
+    }
+  }
+  let scratch = await createScratch({ repoRoot: source });
+  for (const name of excluded) await assert.rejects(access(path.join(scratch.root, name)));
+  const outside = await mkdtemp(path.join(tmpdir(), 'hismia-metadata-'));
+  await symlink(outside, path.join(source, 'apps/front/src/.meta'));
+  scratch = await createScratch({ repoRoot: source });
+  await assert.rejects(access(path.join(scratch.front, 'src/.meta')));
+});
+
 test('snapshot rejects symlinks rather than following public or ancestor escapes', async () => {
   const { source } = await fixture();
   const outside = await mkdtemp(path.join(tmpdir(), 'hismia-outside-'));
@@ -254,6 +277,103 @@ test('readiness timeout stops the child and reports bounded failure evidence', a
   );
   assert.equal((await owned.stop()).quiescent, true);
 });
+
+test('readiness rejects a child that stops listening while returning HTTP 200', async () => {
+  const { scratch } = await fixture();
+  const port = await unusedPort();
+  const marker = path.join(scratch.root, 'response-served.txt');
+  const owned = await ownedFixture(
+    scratch,
+    `
+    import {createServer} from 'node:http';
+    import {writeFileSync} from 'node:fs';
+    const server = createServer((request, response) => {
+      writeFileSync(${JSON.stringify(marker)}, 'served');
+      response.end('owned synthetic response');
+      server.close();
+    });
+    server.listen(${port}, '127.0.0.1');
+    setInterval(() => {}, 1000);
+  `,
+  );
+  try {
+    await assert.rejects(
+      waitReady(owned, { origin: `http://127.0.0.1:${port}`, port, timeoutMs: 1500 }),
+      (error) => error.message === 'Readiness failed' && error.receipt.quiescent === true,
+    );
+    assert.equal(await readFile(marker, 'utf8'), 'served');
+  } finally {
+    await owned.stop();
+  }
+});
+
+for (const timing of ['already-occupied', 'late-acquisition']) {
+  test(`readiness rejects unrelated HTTP 200 despite ${timing} bind collision`, async () => {
+    const { scratch } = await fixture();
+    const port = await unusedPort();
+    const origin = `http://127.0.0.1:${port}`;
+    const marker = path.join(scratch.root, 'child-started.txt');
+    const bindGate = path.join(scratch.root, 'allow-bind.txt');
+    const unrelated = createServer((request, response) =>
+      response.end('unrelated synthetic listener'),
+    );
+    let requests = 0;
+    unrelated.on('request', () => requests++);
+    const listen = () => new Promise((resolve) => unrelated.listen(port, '127.0.0.1', resolve));
+    if (timing === 'already-occupied') await listen();
+    const owned = await ownedFixture(
+      scratch,
+      `
+      import {createServer} from 'node:http';
+      import {existsSync, writeFileSync} from 'node:fs';
+      writeFileSync(${JSON.stringify(marker)}, 'started');
+      const server = createServer((request, response) => response.end('owned synthetic listener'));
+      server.on('error', () => setTimeout(() => process.exit(17), 200));
+      const timer = setInterval(() => {
+        if (!existsSync(${JSON.stringify(bindGate)})) return;
+        clearInterval(timer);
+        server.listen(${port}, '127.0.0.1');
+      }, 10);
+    `,
+    );
+    try {
+      const readiness = waitReady(owned, { origin, port, timeoutMs: 2000 });
+      // Attach the rejection handler immediately, including during fixture startup.
+      const rejected = assert.rejects(
+        readiness,
+        (error) =>
+          error.message === 'Readiness failed' &&
+          error.receipt.quiescent === true &&
+          error.receipt.exitCode === 17,
+      );
+      void rejected.catch(() => {}); // Still awaited below; avoid an early unhandled rejection.
+      if (timing === 'late-acquisition') {
+        const deadline = Date.now() + 1000;
+        while (Date.now() < deadline) {
+          try {
+            await access(marker);
+            break;
+          } catch {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+        }
+        await access(marker);
+        await listen();
+      }
+      // Release the actual bind attempt only after the unrelated listener owns the port.
+      await writeFile(bindGate, 'bind');
+      await rejected;
+      assert.equal((await owned.stop()).quiescent, true);
+      // Cleanup must not kill or close the unrelated listener.
+      assert.equal(await (await fetch(origin)).text(), 'unrelated synthetic listener');
+      assert.ok(requests >= 1);
+    } finally {
+      await owned.stop();
+      unrelated.closeAllConnections();
+      if (unrelated.listening) await new Promise((resolve) => unrelated.close(resolve));
+    }
+  });
+}
 
 test('command failure and timeout preserve exit evidence without child output', async () => {
   const { scratch } = await fixture();
