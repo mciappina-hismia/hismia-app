@@ -42,6 +42,51 @@ const excluded =
   /^(?:\.env.*|\.git|\.svn|\.hg|\.next|\.cache|\.vite|\.turbo|\.pnpm|\.output|\.vercel|node_modules|dist|build|out|coverage|caches?|secrets?|credentials?|private[-_.]?runtime.*|\.?meta)$/i;
 const extensions = /\.(?:tsx?|[cm]?js|json|css|svg|png|jpe?g|webp|ico|woff2?|txt)$/i;
 const layouts = new WeakSet();
+const dependencyStores = new WeakMap();
+function dependencyFailure(category) {
+  return Object.assign(new Error(category), { category });
+}
+async function physicalDirectory(directory) {
+  try {
+    if (!(await lstat(directory)).isDirectory() || (await realpath(directory)) !== directory)
+      throw new Error();
+  } catch {
+    throw dependencyFailure('dependency-store-untrusted');
+  }
+}
+async function trustedStore(scratch, dependencyRoot) {
+  const supplied = dependencyRoot ?? scratch.source;
+  if (
+    typeof supplied !== 'string' ||
+    !path.isAbsolute(supplied) ||
+    path.normalize(supplied) !== supplied
+  )
+    throw dependencyFailure('dependency-store-untrusted');
+  let root;
+  try {
+    if (!(await lstat(supplied)).isDirectory()) throw new Error();
+    root = await realpath(supplied);
+  } catch {
+    throw dependencyFailure('dependency-store-untrusted');
+  }
+  await physicalDirectory(root);
+  const store = path.join(root, 'node_modules/.pnpm');
+  await physicalDirectory(path.dirname(store));
+  await physicalDirectory(store);
+  if (dependencyRoot !== undefined) {
+    for (const area of areas) {
+      const expected = path.join(root, area, 'node_modules');
+      await physicalDirectory(expected);
+      try {
+        if ((await realpath(path.join(scratch.source, area, 'node_modules'))) !== expected)
+          throw new Error();
+      } catch {
+        throw dependencyFailure('dependency-store-untrusted');
+      }
+    }
+  }
+  return store;
+}
 function inside(root, file) {
   const relative = path.relative(root, file);
   return (
@@ -116,8 +161,10 @@ export async function createScratch({ repoRoot, parent = tmpdir() }) {
 }
 
 /** Direct package links only; the node_modules directory itself is scratch-owned. */
-export async function linkDependencies(scratch) {
+export async function linkDependencies(scratch, { dependencyRoot } = {}) {
   requireScratch(scratch);
+  let store =
+    dependencyRoot === undefined ? undefined : await trustedStore(scratch, dependencyRoot);
   for (const area of areas) {
     const directory = path.join(scratch.root, area);
     const metadata = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
@@ -133,34 +180,31 @@ export async function linkDependencies(scratch) {
       } else {
         if (name.startsWith('@hismia/') || String(dependencies[name]).startsWith('workspace:'))
           throw new Error('Unknown workspace dependency');
-        const store = path.join(scratch.source, 'node_modules/.pnpm');
-        // Reject redirected store roots. Normal pnpm package links are allowed.
-        for (const directory of [path.dirname(store), store]) {
-          try {
-            if (!(await lstat(directory)).isDirectory()) throw new Error();
-          } catch {
-            throw new Error('Invalid public dependency store');
-          }
-        }
+        store ??= await trustedStore(scratch);
         for (const base of [path.join(scratch.source, area), scratch.source]) {
+          const modules = path.join(base, 'node_modules');
           try {
-            target = await realpath(path.join(base, 'node_modules', name));
+            if (dependencyRoot === undefined) {
+              const stat = await lstat(modules);
+              if (!stat.isDirectory() || (await realpath(modules)) !== modules)
+                throw dependencyFailure('dependency-store-untrusted');
+            }
+            target = await realpath(path.join(modules, name));
             break;
           } catch (error) {
-            if (error.code !== 'ENOENT') throw new Error('Public dependency unavailable');
+            if (error.code !== 'ENOENT')
+              throw error.category ? error : dependencyFailure('dependency-store-untrusted');
           }
         }
-        if (
-          !target ||
-          !inside(store, target) ||
-          !target.endsWith(`${path.sep}node_modules${path.sep}${name}`)
-        )
-          throw new Error('Dependency outside public store');
+        if (!target) throw dependencyFailure('dependency-missing');
+        if (!inside(store, target) || !target.endsWith(`${path.sep}node_modules${path.sep}${name}`))
+          throw dependencyFailure('dependency-target-outside-store');
       }
       await mkdir(path.dirname(destination), { recursive: true });
       await symlink(target, destination, 'dir');
     }
   }
+  if (store) dependencyStores.set(scratch, store);
 }
 
 export function loopbackOrigin(value, expectedPort) {
@@ -250,12 +294,17 @@ export async function spawnOwned({
   )
     throw new Error('Invalid command argument');
   const scriptPath = await realpath(script);
-  const store = path.join(scratch.source, 'node_modules/.pnpm');
+  const store = dependencyStores.get(scratch);
+  if (store) {
+    await physicalDirectory(path.dirname(store));
+    await physicalDirectory(store);
+  }
   const publicCli =
+    store &&
     inside(store, scriptPath) &&
     /\/node_modules\/(?:typescript\/bin\/tsc|next\/dist\/bin\/next)$/.test(scriptPath);
   if (
-    (!inside(scratch.root, scriptPath) && !inside(store, scriptPath)) ||
+    (!inside(scratch.root, scriptPath) && !publicCli) ||
     !(await lstat(scriptPath)).isFile() ||
     (!/\.(?:[cm]?js)$/.test(scriptPath) && !publicCli)
   )
