@@ -35,6 +35,88 @@ function fillProfessional() {
 }
 
 describe('create-only profile form', () => {
+  it('passes trimmed validated values to transport, not raw UI input', async () => {
+    render(
+      <OnboardingForm
+        authorize={authorize}
+        initialType="professional"
+        now={today}
+        onSignin={vi.fn()}
+      />,
+    );
+    fillProfessional();
+    fireEvent.change(screen.getByLabelText('Nombre visible'), {
+      target: { value: ' Doctor Test ' },
+    });
+    submit();
+    await waitFor(() =>
+      expect(createProfile).toHaveBeenCalledWith(
+        'synthetic-token',
+        {
+          accountType: 'professional',
+          displayName: 'Doctor Test',
+          specialty: 'General',
+          practiceLocality: 'City',
+        },
+        '2026-03-01',
+      ),
+    );
+  });
+  it('clears hidden patient fields and errors through a round-trip type change', async () => {
+    render(
+      <OnboardingForm authorize={authorize} initialType="patient" now={today} onSignin={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByLabelText('Nombre visible'), { target: { value: 'Synthetic' } });
+    fireEvent.change(screen.getByLabelText('Fecha de nacimiento'), {
+      target: { value: '2008-02-29' },
+    });
+    fireEvent.change(screen.getByLabelText('Género (opcional)'), { target: { value: 'mujer' } });
+    submit();
+    await screen.findByText('Ingresa una localidad de residencia; no puede estar vacía.');
+    fireEvent.change(screen.getByLabelText('Tipo de cuenta'), { target: { value: 'institution' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Tipo de cuenta'), { target: { value: 'patient' } });
+    expect(screen.getByLabelText('Nombre visible')).toHaveValue('');
+    expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('');
+    expect(screen.getByLabelText('Género (opcional)')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('Tipo de cuenta'), {
+      target: { value: 'professional' },
+    });
+    fillProfessional();
+    submit();
+    await waitFor(() =>
+      expect(createProfile).toHaveBeenCalledWith(
+        'synthetic-token',
+        {
+          accountType: 'professional',
+          displayName: 'Doctor Test',
+          specialty: 'General',
+          practiceLocality: 'City',
+        },
+        '2026-03-01',
+      ),
+    );
+  });
+  it('never posts if identity becomes stale during async authorization', async () => {
+    let current = true;
+    authorize.mockImplementationOnce(async () => {
+      current = false;
+      return { kind: 'ready', token: 'synthetic-token' };
+    });
+    render(
+      <ProfileForm
+        authorize={authorize}
+        isCurrent={() => current}
+        initialType="professional"
+        now={today}
+        onSignin={vi.fn()}
+      />,
+    );
+    fillProfessional();
+    submit();
+    await waitFor(() => expect(authorize).toHaveBeenCalledOnce());
+    expect(createProfile).not.toHaveBeenCalled();
+  });
   it.each([
     ['patient', ['Nombre visible', 'Fecha de nacimiento', 'Localidad de residencia']],
     ['professional', ['Nombre visible', 'Especialidad', 'Localidad de ejercicio']],
