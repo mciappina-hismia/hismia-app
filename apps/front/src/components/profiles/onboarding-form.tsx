@@ -5,21 +5,11 @@ import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { accountProfileSchema } from '@hismia/validation';
 import type { AccountProfileInput, PersistedProfile } from '@hismia/types';
-import { ACCOUNT_TYPES, type AccountType } from '../../lib/auth/preference';
+import { ACCOUNT_TYPES, isAccountType, type AccountType } from '../../lib/auth/preference';
 import { createProfile } from '../../lib/profiles/client';
 
-type FormFields = {
-  accountType: AccountType;
-  displayName?: string;
-  birthDate?: string;
-  gender?: string;
-  residenceLocality?: string;
-  specialty?: string;
-  practiceLocality?: string;
-  name?: string;
-  type?: string;
-  location?: string;
-};
+import type { FormFieldName, FormValues } from './onboarding-form.types';
+import { emptyFormValues, normalizeFormValues, parseFormValues } from './onboarding-form.values';
 
 export type SubmitAccess = () => Promise<
   { kind: 'ready'; token: string } | { kind: 'signin' | 'unavailable' }
@@ -39,7 +29,7 @@ const labels: Record<AccountType, string> = {
   institution: 'Institución',
 };
 // Presentation copy only: the shared schema remains the validation authority.
-const fieldMessages: Record<keyof FormFields, string> = {
+const fieldMessages: Record<FormFieldName, string> = {
   accountType: 'Elige un tipo de cuenta válido.',
   displayName: 'Ingresa un nombre visible; no puede estar vacío.',
   birthDate: 'Ingresa una fecha de nacimiento válida; debes tener al menos 18 años.',
@@ -72,25 +62,29 @@ export function OnboardingForm({
       mounted.current = false;
     };
   }, []);
-  const resolver: Resolver<FormFields> = useCallback(
+  const resolver: Resolver<FormValues, undefined, AccountProfileInput> = useCallback(
     async (values, context, options) => {
-      const normalized: FormFields = { ...values };
-      if (normalized.accountType === 'patient' && !normalized.gender) delete normalized.gender;
-      return zodResolver(accountProfileSchema(now().toISOString().slice(0, 10)))(
-        normalized,
+      const asOf = now().toISOString().slice(0, 10);
+      const parsed = parseFormValues(values, asOf);
+      if (parsed.success) return { values: parsed.data, errors: {} };
+      // The installed resolver types cannot express transformed output. Use it only
+      // to map shared validation failures to RHF errors/refs; never trust its values.
+      const invalid = await zodResolver(accountProfileSchema(asOf))(
+        normalizeFormValues(values),
         context,
         options,
-      ) as ReturnType<Resolver<FormFields>>;
+      );
+      return { values: {}, errors: invalid.errors };
     },
     [now],
   );
-  const form = useForm<FormFields>({
-    defaultValues: { accountType: initialType ?? 'patient' },
+  const form = useForm<FormValues, undefined, AccountProfileInput>({
+    defaultValues: emptyFormValues(initialType ?? 'patient'),
     resolver,
   });
   const typeRegistration = form.register('accountType');
 
-  async function submit(input: FormFields): Promise<void> {
+  async function submit(input: AccountProfileInput): Promise<void> {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
@@ -105,7 +99,7 @@ export function OnboardingForm({
         return;
       }
       const asOf = now().toISOString().slice(0, 10);
-      const result = await createProfile(access.token, input as AccountProfileInput, asOf);
+      const result = await createProfile(access.token, input, asOf);
       if (!mounted.current || !isCurrent()) return;
       if (result.kind === 'saved') setSaved(result.profile);
       else if (result.kind === 'signin') onSignin();
@@ -138,12 +132,12 @@ export function OnboardingForm({
   const fieldClass =
     'min-h-touch w-full rounded-xl border border-input-border bg-input px-4 py-3 text-base text-fg transition-colors focus:border-primary-strong disabled:cursor-not-allowed disabled:opacity-60';
   const labelClass = 'block text-sm font-medium text-fg';
-  function errorAttributes(name: keyof FormFields) {
-    const invalid = Boolean(form.formState.errors[name]);
+  function errorAttributes(name: FormFieldName) {
+    const invalid = Boolean(form.getFieldState(name, form.formState).error);
     return { 'aria-invalid': invalid, 'aria-describedby': invalid ? `${name}-error` : undefined };
   }
-  function fieldError(name: keyof FormFields) {
-    return form.formState.errors[name] ? (
+  function fieldError(name: FormFieldName) {
+    return form.getFieldState(name, form.formState).error ? (
       <p id={`${name}-error`} className="text-sm text-danger">
         {fieldMessages[name]}
       </p>
@@ -166,9 +160,10 @@ export function OnboardingForm({
           {...errorAttributes('accountType')}
           disabled={busy}
           onChange={(event) => {
-            const type = event.target.value as AccountType;
+            const type = event.target.value;
+            if (!isAccountType(type)) return;
             setAccountType(type);
-            form.reset({ accountType: type });
+            form.reset(emptyFormValues(type));
             setMessage('');
           }}
           className={fieldClass}
